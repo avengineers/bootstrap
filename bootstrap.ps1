@@ -86,3 +86,15 @@ if ((Test-Path -Path 'requirements.txt') -or (Test-Path -Path 'Pipfile')) {
         Invoke-CommandLine -CommandLine "python -m pipenv install"
     }
 }
+
+if ((Test-Path -Path '.west/config')) {
+    # install west into pipenv or pip
+    if (Test-Path -Path '.venv') {
+        Invoke-CommandLine -CommandLine "python -m pipenv install west"
+    } else {
+        Invoke-CommandLine -CommandLine "python -m pip install west"
+    }
+
+    Update-Env
+    Invoke-CommandLine -CommandLine "west update"
+}
