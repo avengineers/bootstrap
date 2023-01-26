@@ -113,10 +113,10 @@ Describe "install scoop" {
 
   It "shall run scoop if scoopfile exists" {
     Mock -CommandName Test-Path -MockWith { $true }
-    Mock -CommandName Test-Path -MockWith { $true }
+    Mock -CommandName Get-Command -MockWith { $true }
 
     Install-Scoop
-    Should -Invoke -CommandName Invoke-CommandLine -Times 4
+    Should -Invoke -CommandName Invoke-CommandLine -Times 8
     Should -Invoke -CommandName Edit-Env -Times 1
   }
 }

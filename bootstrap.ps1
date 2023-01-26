@@ -66,8 +66,14 @@ Function Install-Scoop {
         # Initial Scoop installation
         if (-Not (Get-Command 'scoop' -ErrorAction SilentlyContinue)) {
             (New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/xxthunder/ScoopInstall/master/install.ps1') | Invoke-Expression
+            Invoke-CommandLine -CommandLine "scoop bucket rm main" -Silent $true -StopAtError $false
+            Invoke-CommandLine -CommandLine "scoop bucket add main" -Silent $true
             Edit-Env
         }
+
+        # install needed tools
+        Invoke-CommandLine -CommandLine "scoop update"
+        Invoke-CommandLine -CommandLine "scoop install lessmsi"
 
         # Some old tweak to get 7zip installed correctly
         Invoke-CommandLine -CommandLine "scoop config use_lessmsi $true"
@@ -75,8 +81,9 @@ Function Install-Scoop {
         # avoid deadlocks while updating scoop buckets
         Invoke-CommandLine -CommandLine "scoop config autostash_on_conflict $true"
 
-        # install needed tools
-        Invoke-CommandLine -CommandLine "scoop update"
+        Invoke-CommandLine -CommandLine "scoop install 7zip"
+        Invoke-CommandLine -CommandLine "scoop install innounp"
+        Invoke-CommandLine -CommandLine "scoop install dark"
         Invoke-CommandLine -CommandLine "scoop import scoopfile.json"
         Edit-Env
     }
