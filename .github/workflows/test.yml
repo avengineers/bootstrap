@@ -1,0 +1,23 @@
+name: selftests
+
+on:
+  push:
+    branches: [develop]
+  pull_request:
+    branches: [develop]
+
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: install tools and run selftests
+        run: |
+          .\build.ps1
+        shell: powershell
