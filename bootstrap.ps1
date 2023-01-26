@@ -103,7 +103,7 @@ Function Install-Python-Dependency {
         if ($clean) {
             # Start with a fresh virtual environment
             if (Test-Path -Path '.venv') {
-                Invoke-CommandLine -CommandLine "python -m pipenv --rm"
+                Invoke-CommandLine -CommandLine "python -m pipenv --rm" -StopAtError $false
             }
         }
         if (-Not (Test-Path -Path '.venv')) {
