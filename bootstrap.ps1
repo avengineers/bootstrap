@@ -65,7 +65,13 @@ Function Install-Scoop {
     if (Test-Path -Path 'scoopfile.json') {
         # Initial Scoop installation
         if (-Not (Get-Command 'scoop' -ErrorAction SilentlyContinue)) {
-            (New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/xxthunder/ScoopInstall/master/install.ps1') | Invoke-Expression
+            if ((New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+                (New-Object System.Net.WebClient).DownloadFile('https://raw.githubusercontent.com/xxthunder/ScoopInstall/master/install.ps1', ".\build\install-scoop.ps1")
+                & .\build\install-scoop.ps1 -RunAsAdmin
+            } else {
+                & .\build\install-scoop.ps1
+            }
+
             Invoke-CommandLine -CommandLine "scoop bucket rm main" -Silent $true -StopAtError $false
             Invoke-CommandLine -CommandLine "scoop bucket add main" -Silent $true
             Edit-Env
