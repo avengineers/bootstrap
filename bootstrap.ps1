@@ -72,10 +72,10 @@ Function Install-Scoop {
         # Initial Scoop installation
         if (-Not (Get-Command 'scoop' -ErrorAction SilentlyContinue)) {
             if ((New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-                (New-Object System.Net.WebClient).DownloadFile('https://raw.githubusercontent.com/xxthunder/ScoopInstall/master/install.ps1', "$PSScriptRoot\install-scoop.ps1")
-                & $PSScriptRoot\install-scoop.ps1 -RunAsAdmin
+                (New-Object System.Net.WebClient).DownloadFile('https://raw.githubusercontent.com/xxthunder/ScoopInstall/master/install.ps1', "$PSScriptRoot\bootstrap.scoop.ps1")
+                & $PSScriptRoot\bootstrap.scoop.ps1 -RunAsAdmin
             } else {
-                & $PSScriptRoot\install-scoop.ps1
+                & $PSScriptRoot\bootstrap.scoop.ps1
             }
 
             Invoke-CommandLine -CommandLine "scoop bucket rm main" -Silent $true -StopAtError $false
