@@ -7,7 +7,6 @@ $InformationPreference = "Continue"
 Function Edit-Env {
     # workaround for GithubActions
     if ($Env:INVERT_PATH_VARIABLE -eq "true") {
-        (New-Object System.Net.WebClient).DownloadFile('https://raw.githubusercontent.com/xxthunder/ScoopInstall/master/install.ps1', "$PSScriptRoot\install-scoop.ps1")
         $Env:Path = [System.Environment]::GetEnvironmentVariable("Path", "User") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "Machine")
     } else {
         $Env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
@@ -71,8 +70,8 @@ Function Install-Scoop {
     if (Test-Path -Path 'scoopfile.json') {
         # Initial Scoop installation
         if (-Not (Get-Command 'scoop' -ErrorAction SilentlyContinue)) {
+            (New-Object System.Net.WebClient).DownloadFile('https://raw.githubusercontent.com/xxthunder/ScoopInstall/master/install.ps1', "$PSScriptRoot\bootstrap.scoop.ps1")
             if ((New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-                (New-Object System.Net.WebClient).DownloadFile('https://raw.githubusercontent.com/xxthunder/ScoopInstall/master/install.ps1', "$PSScriptRoot\bootstrap.scoop.ps1")
                 & $PSScriptRoot\bootstrap.scoop.ps1 -RunAsAdmin
             } else {
                 & $PSScriptRoot\bootstrap.scoop.ps1
