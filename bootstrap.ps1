@@ -6,7 +6,7 @@ $InformationPreference = "Continue"
 
 Function Edit-Env {
     # workaround for GithubActions
-    if ((New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    if ($Env:INVERT_PATH_VARIABLE -eq "true") {
         (New-Object System.Net.WebClient).DownloadFile('https://raw.githubusercontent.com/xxthunder/ScoopInstall/master/install.ps1', "$PSScriptRoot\install-scoop.ps1")
         $Env:Path = [System.Environment]::GetEnvironmentVariable("Path", "User") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "Machine")
     } else {
