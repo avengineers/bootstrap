@@ -5,7 +5,7 @@ if ($lastexitcode -ne 0) {
     throw ("Unit Test: " + $errorMessage)
 }
 
-powershell -Command "Invoke-ScriptAnalyzer -EnableExit -Recurse -Path . -ExcludeRule PSAvoidUsingInvokeExpression"
+powershell -Command "Invoke-ScriptAnalyzer -EnableExit -Recurse -Path ."
 if ($lastexitcode -ne 0) {
     throw ("Powershell Linter: " + $errorMessage)
 }

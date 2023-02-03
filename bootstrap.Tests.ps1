@@ -1,8 +1,3 @@
-# to execute tests you have to
-# 1. Update 'Pester': "Install-Module -Name Pester -Force -SkipPublisherCheck"
-# 2. call "Invoke-Pester spl-functions.Tests.ps1" from within the test directory
-# Note: I noticed that sometimes after a test was changed it will fail with a overloading problem; retry helps
-
 $WebProxy = [net.webrequest]::defaultwebproxy
 
 BeforeAll {

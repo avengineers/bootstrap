@@ -15,6 +15,7 @@ Function Edit-Env {
 }
 
 Function Invoke-CommandLine {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingInvokeExpression', '', Justification='Usually this statement must be avoided (https://learn.microsoft.com/en-us/powershell/scripting/learn/deep-dives/avoid-using-invoke-expression?view=powershell-7.3), here it is OK as it does not execute unknown code.')]
     param (
         [Parameter(Mandatory = $true, Position = 0)]
         [string]$CommandLine,
