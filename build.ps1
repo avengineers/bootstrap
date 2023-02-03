@@ -1,13 +1,6 @@
 $ErrorActionPreference = 'Stop'
 
-# TODO: ugly workaround to invoke tests twice, first time always fails.
-try {
-    Invoke-Pester bootstrap.Tests.ps1
-}
-catch {
-    Invoke-Pester bootstrap.Tests.ps1
-}
-
+Invoke-Pester bootstrap.Tests.ps1
 if ($lastexitcode -ne 0) {
     throw ("Unit Test: " + $errorMessage)
 }
