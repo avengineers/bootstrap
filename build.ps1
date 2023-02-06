@@ -1,11 +1,11 @@
 $ErrorActionPreference = 'Stop'
 
-Invoke-Pester bootstrap.Tests.ps1
+powershell -Command "Invoke-ScriptAnalyzer -ReportSummary -Severity Warning -EnableExit -Recurse -Path ."
 if ($lastexitcode -ne 0) {
-    throw ("Unit Test: " + $errorMessage)
+    Write-Error "Rule violation(s) found."
 }
 
-powershell -Command "Invoke-ScriptAnalyzer -EnableExit -Recurse -Path ."
+Invoke-Pester bootstrap.Tests.ps1
 if ($lastexitcode -ne 0) {
-    throw ("Powershell Linter: " + $errorMessage)
+    Write-Error "Unit test(s) failed."
 }
