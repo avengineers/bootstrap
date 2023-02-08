@@ -1,7 +1,7 @@
 $WebProxy = [net.webrequest]::defaultwebproxy
 
 BeforeAll {
-  [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', '', Justification = 'Variable i used in included script.')]
+  [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', '', Justification = 'Variable I used in included script.')]
   $TestExecution = $true
   . .\bootstrap.ps1
 }

@@ -106,7 +106,7 @@ Function Install-Scoop {
 Function Install-Python-Dependency {
     if ((Test-Path -Path 'requirements.txt') -or (Test-Path -Path 'Pipfile')) {
         # Prepare python environment
-        Invoke-CommandLine -CommandLine "python -m pip install pipenv"
+        Invoke-CommandLine -CommandLine "python -m pip install pipenv pip-system-certs"
         Edit-Env
         if ($clean) {
             # Start with a fresh virtual environment
