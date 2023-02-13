@@ -1,7 +1,9 @@
-# Stop execution on first error
+# About preference variables: https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_preference_variable
+
+# Stop execution on first non-terminating error (an error that doesn't stop the cmdlet processing)
 $ErrorActionPreference = "Stop"
 
-# Always set the $InformationPreference variable to "Continue"
+# Write-Information always displays the informational message, and continues running
 $InformationPreference = "Continue"
 
 Function Edit-Env {
