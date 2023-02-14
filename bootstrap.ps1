@@ -17,7 +17,7 @@ Function Edit-Env {
 }
 
 Function Invoke-CommandLine {
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingInvokeExpression', '', Justification='Usually this statement must be avoided (https://learn.microsoft.com/en-us/powershell/scripting/learn/deep-dives/avoid-using-invoke-expression?view=powershell-7.3), here it is OK as it does not execute unknown code.')]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingInvokeExpression', '', Justification = 'Usually this statement must be avoided (https://learn.microsoft.com/en-us/powershell/scripting/learn/deep-dives/avoid-using-invoke-expression?view=powershell-7.3), here it is OK as it does not execute unknown code.')]
     param (
         [Parameter(Mandatory = $true, Position = 0)]
         [string]$CommandLine,
@@ -81,10 +81,10 @@ Function Install-Scoop {
             else {
                 & $PSScriptRoot\bootstrap.scoop.ps1
             }
+            Edit-Env
 
             Invoke-CommandLine -CommandLine "scoop bucket rm main" -Silent $true -StopAtError $false
             Invoke-CommandLine -CommandLine "scoop bucket add main" -Silent $true
-            Edit-Env
         }
 
         # install needed tools
@@ -109,7 +109,7 @@ Function Install-Python-Dependency {
     if ((Test-Path -Path 'requirements.txt') -or (Test-Path -Path 'Pipfile')) {
         # Prepare python environment
         Invoke-CommandLine -CommandLine "python -m pip install pipenv pip-system-certs"
-        Edit-Env
+
         if ($clean) {
             # Start with a fresh virtual environment
             if (Test-Path -Path '.venv') {
@@ -137,8 +137,6 @@ Function Install-West {
         else {
             Invoke-CommandLine -CommandLine "python -m pip install west"
         }
-
-        Edit-Env
         Invoke-CommandLine -CommandLine "west update"
     }
 }
