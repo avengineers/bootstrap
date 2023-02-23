@@ -190,12 +190,14 @@ Function Initialize-File-With-Confirmation {
         New-Item -ItemType Directory $parentPath
     }
     Write-Output "Creating file $FilePath"
-    $FileContent | Out-File -FilePath $FilePath -Encoding utf8
+    # This does not work for PowerShell 5
+    #$FileContent | Out-File -FilePath $FilePath -Encoding utf8
+    [IO.File]::WriteAllLines($FilePath, $FileContent)
 }
 
 Function Edit-Env {
     # workaround for GithubActions
-    if ($Env:INVERT_PATH_VARIABLE -eq "true") {
+    if ($Env:USER_PATH_FIRST -eq "true") {
         $Env:Path = [System.Environment]::GetEnvironmentVariable("Path", "User") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "Machine")
     }
     else {
