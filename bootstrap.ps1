@@ -259,7 +259,7 @@ Function Install-Scoop {
 
         # some prerequisites to install other packages
         Invoke-CommandLine "scoop install 7zip" -Silent $true
-        Invoke-CommandLine "scoop install innounp" -Silent $true
+        Invoke-CommandLine "scoop install innounp" -StopAtError $false -Silent $true
         Invoke-CommandLine "scoop install dark" -Silent $true
         Invoke-CommandLine "scoop import scoopfile.json"
         Edit-Env

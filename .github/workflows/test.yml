@@ -1,4 +1,4 @@
-name: selftests
+name: CI
 
 on:
   push:
@@ -9,8 +9,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
-    name: PowerShell
+  test_pwsh:
+    name: Unit and Integration Tests (Powershell 7.x)
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -19,6 +19,7 @@ jobs:
           submodules: true
       - name: install tools and run selftests
         run: |
+          Write-Output $PSVersionTable
           .\tests\bin\init.ps1
           .\tests\bin\test.ps1
         shell: pwsh
@@ -28,3 +29,17 @@ jobs:
         with:
           files: |
             tests/out/TestResults.xml
+  test_powershell:
+    name: Unit and Integration Tests (Powershell 5.x)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: install tools and run selftests
+        run: |
+          Write-Output $PSVersionTable
+          .\tests\bin\init.ps1
+          .\tests\bin\test.ps1
+        shell: powershell
