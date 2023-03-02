@@ -15,7 +15,7 @@ BeforeAll {
     # Inhibit execution of Main function of SUT
     Set-Alias Main out-null
     . "$testDataWithProxy\build.ps1"
-    Remove-Alias Main
+    Remove-Item Alias:Main
 }
 
 Describe "Full integration tests for project creation" {
@@ -144,7 +144,7 @@ Describe "invoking command line calls" {
     }
 }
 
-Describe 'Analysis of generated build script against Script Analyzer Rules' {
+Describe "Analysis of generated build script 'build.ps1' against Script Analyzer Rules" {
     It "Shall not have deviations" {
         $analysisRules = Get-ScriptAnalyzerRule -Severity Warning, Error
         $analysisResult = Invoke-ScriptAnalyzer -IncludeRule $analysisRules -Path "$testDataWithProxy\build.ps1"

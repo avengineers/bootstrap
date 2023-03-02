@@ -3,13 +3,13 @@
     Wrapper for installing dependencies of a project
 #>
 
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', '', Justification = 'Used in global scope in Main function')]
 param(
     [System.IO.FileInfo]$init ## initialize an project directory
     , [String]$proxy ## initialize proxy configuration
 )
 
 # About preference variables: https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_preference_variable
-
 # Stop execution on first non-terminating error (an error that doesn't stop the cmdlet processing)
 $ErrorActionPreference = "Stop"
 
@@ -28,6 +28,7 @@ popd
 '@
 
     Initialize-File-With-Confirmation (Join-Path $DirPath 'build.ps1') @'
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', '', Justification = 'Used in global scope in Main function')]
 param(
     [switch]$clean ## clean build, wipe out all build artifacts
     , [switch]$install ## install mandatory packages
@@ -88,13 +89,6 @@ Function Initialize-Proxy {
 }
 
 Function Main {
-    param (
-        [Parameter(Position = 0)]
-        [bool]$install,
-        [Parameter(Position = 1)]
-        [bool]$clean
-    )
-
     Push-Location $PSScriptRoot
     Write-Output "Running in ${pwd}"
     
@@ -129,8 +123,7 @@ Function Main {
 
 ## start of script
 $ErrorActionPreference = "Stop"
-
-Main $install $clean
+Main
 ## end of script
 
 '@
@@ -190,9 +183,16 @@ Function Initialize-File-With-Confirmation {
         New-Item -ItemType Directory $parentPath
     }
     Write-Output "Creating file $FilePath"
-    # This does not work for PowerShell 5
-    #$FileContent | Out-File -FilePath $FilePath -Encoding utf8
-    [IO.File]::WriteAllLines($FilePath, $FileContent)
+    
+    #
+    if ($PSVersionTable.PSVersion.Major -eq 5) {
+        [IO.File]::WriteAllLines($FilePath, $FileContent)
+    }
+    else {
+        # This does not work for PowerShell 5. There the default encoding
+        # for cmdlet Out-File is utf8bom, which leads to corrupt build.bat.
+        $FileContent | Out-File -FilePath $FilePath -Encoding utf8
+    }
 }
 
 Function Edit-Env {
@@ -312,13 +312,6 @@ Function Install-West {
 }
 
 Function Main {
-    param (
-        [Parameter(Position = 0)]
-        [System.IO.FileInfo]$init,
-        [Parameter(Position = 1)]
-        [String]$proxy
-    )
-
     if ($init) {
         Initialize-Directory $init $proxy
     }
@@ -330,5 +323,5 @@ Function Main {
 }
 
 ## start of script
-Main $init $proxy
+Main
 ## end of script
