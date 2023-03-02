@@ -4,7 +4,7 @@ BeforeAll {
     # Inhibit execution of Main function of SUT
     Set-Alias Main out-null
     . ".\$sut"
-    Remove-Alias Main
+    Remove-Item Alias:Main
 }
 
 Describe "Initialize a new project directory" {
