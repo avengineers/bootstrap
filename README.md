@@ -73,7 +73,9 @@ This repository provides an easy way to setup a Python and/or West based project
 
 * Further steps:
   * Creation of virtual Python environment:
-   
+
     ```powershell
-    python -m pipenv install
+    New-Item -ItemType Directory .venv
+    New-Item -ItemType File Pipfile
+    .\build.ps1 -install
     ```
