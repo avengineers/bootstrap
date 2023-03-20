@@ -3,10 +3,11 @@
     Wrapper for installing dependencies of a project
 #>
 
-[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', '', Justification = 'Used in global scope in Main function')]
 param(
-    [System.IO.FileInfo]$init ## initialize an project directory
-    , [String]$proxy ## initialize proxy configuration
+    [Parameter(Mandatory = $false, Position = 0, HelpMessage = 'Directory to be initialized (String)')]
+    [System.IO.FileInfo]$init,
+    [Parameter(Mandatory = $false, Position = 1, HelpMessage = 'Proxy configuration to be initialized (String)')]
+    [String]$proxy
 )
 
 # About preference variables: https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_preference_variable
@@ -98,13 +99,14 @@ Function Main {
         if (-Not (Test-Path -Path '.bootstrap')) {
             New-Item -ItemType Directory '.bootstrap'
         }
+        # Installation of Scoop, Python and pipenv via bootstrap
         $bootstrapSource = 'https://raw.githubusercontent.com/avengineers/bootstrap/develop/bootstrap.ps1'
         if ($Env:GITHUB_HEAD_REF){
             $bootstrapSource = "https://raw.githubusercontent.com/avengineers/bootstrap/$Env:GITHUB_HEAD_REF/bootstrap.ps1"
             Write-Output "Downloading bootstrap from $bootstrapSource ..."
         }
         Invoke-RestMethod $bootstrapSource -OutFile '.\.bootstrap\bootstrap.ps1'
-        . .\.bootstrap\bootstrap.ps1
+        Invoke-CommandLine '. .\.bootstrap\bootstrap.ps1' -Silent $true
         Write-Output "For installation changes to take effect, please close and re-open your current shell."
     }
     else {
@@ -237,7 +239,7 @@ Function Install-Scoop {
         Write-Output "File 'scoopfile.json' found, installing scoop and running 'scoop import' ..."
         # Initial Scoop installation
         if (-Not (Get-Command 'scoop' -ErrorAction SilentlyContinue)) {
-            Invoke-RestMethod 'https://raw.githubusercontent.com/xxthunder/ScoopInstall/master/install.ps1' -outfile "$PSScriptRoot\bootstrap.scoop.ps1"
+            Invoke-RestMethod 'https://raw.githubusercontent.com/ScoopInstaller/Install/master/install.ps1' -outfile "$PSScriptRoot\bootstrap.scoop.ps1"
             if ((New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
                 & $PSScriptRoot\bootstrap.scoop.ps1 -RunAsAdmin
             }
@@ -312,6 +314,11 @@ Function Install-West {
 }
 
 Function Main {
+    # Same parameters as for the script
+    param(
+        [System.IO.FileInfo]$init,
+        [String]$proxy
+    )
     if ($init) {
         Initialize-Directory $init $proxy
     }
@@ -323,5 +330,5 @@ Function Main {
 }
 
 ## start of script
-Main
+Main @PSBoundParameters
 ## end of script
