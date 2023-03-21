@@ -291,7 +291,7 @@ Function Install-Python-Dependency {
         }
         else {
             Write-Output "File 'Pipfile' found, running 'python -m pipenv' to create a virtual environment ..."
-            Invoke-CommandLine "python -m pipenv install"
+            Invoke-CommandLine "python -m pipenv install --dev"
         }
     }
     else {
