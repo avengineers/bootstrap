@@ -133,7 +133,7 @@ Describe "install python deps" {
         Mock -CommandName Test-Path -MockWith { $false }
 
         Install-Python-Dependency
-        Should -Invoke -CommandName Invoke-CommandLine -Times 1
+        Should -Invoke -CommandName Invoke-CommandLine -Times 0
     }
 
     It "shall run python deps installation if requirements.txt exists and create .venv directory" {
