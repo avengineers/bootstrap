@@ -197,9 +197,10 @@ Function Initialize-File-With-Confirmation {
     }
 }
 
-Function Edit-Env {
-    # workaround for GithubActions
-    if ($Env:USER_PATH_FIRST -eq "true") {
+# Update/Reload current environment variable PATH with settings from registry
+Function Initialize-EnvPath {
+    # workaround for system-wide installations
+    if ($Env:USER_PATH_FIRST) {
         $Env:Path = [System.Environment]::GetEnvironmentVariable("Path", "User") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "Machine")
     }
     else {
@@ -246,7 +247,7 @@ Function Install-Scoop {
             else {
                 & $PSScriptRoot\bootstrap.scoop.ps1
             }
-            Edit-Env
+            Initialize-EnvPath
         }
 
         # install needed tools
@@ -264,7 +265,7 @@ Function Install-Scoop {
         Invoke-CommandLine "scoop install innounp" -StopAtError $false -Silent $true
         Invoke-CommandLine "scoop install dark" -Silent $true
         Invoke-CommandLine "scoop import scoopfile.json"
-        Edit-Env
+        Initialize-EnvPath
     }
     else {
         Write-Output "File 'scoopfile.json' not found, skipping Scoop setup."
@@ -306,9 +307,6 @@ Function Install-West {
             New-Item -ItemType Directory '.venv'
         }
         Invoke-CommandLine "python -m pipenv install west"
-    }
-    else {
-        Write-Output "File '.west/config' not found, skipping west setup."
     }
 }
 
