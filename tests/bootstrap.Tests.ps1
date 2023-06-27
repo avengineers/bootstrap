@@ -102,7 +102,7 @@ Describe "install scoop" {
     BeforeEach {
         Mock -CommandName Invoke-Expression -MockWith {}
         Mock -CommandName Invoke-CommandLine -MockWith {}
-        Mock -CommandName Edit-Env -MockWith {}
+        Mock -CommandName Initialize-EnvPath -MockWith {}
     }
 
     It "shall not run scoop if no scoopfile exists" {
@@ -111,7 +111,7 @@ Describe "install scoop" {
         Install-Scoop
         Should -Invoke -CommandName Invoke-Expression -Times 0
         Should -Invoke -CommandName Invoke-CommandLine -Times 0
-        Should -Invoke -CommandName Edit-Env -Times 0
+        Should -Invoke -CommandName Initialize-EnvPath -Times 0
     }
 
     It "shall run scoop if scoopfile exists" {
@@ -120,7 +120,7 @@ Describe "install scoop" {
 
         Install-Scoop
         Should -Invoke -CommandName Invoke-CommandLine -Times 8
-        Should -Invoke -CommandName Edit-Env -Times 1
+        Should -Invoke -CommandName Initialize-EnvPath -Times 1
     }
 }
 
