@@ -119,7 +119,7 @@ Describe "install scoop" {
         Mock -CommandName Get-Command -MockWith { $true }
 
         Install-Scoop
-        Should -Invoke -CommandName Invoke-CommandLine -Times 8
+        Should -Invoke -CommandName Invoke-CommandLine -Times 4
         Should -Invoke -CommandName Initialize-EnvPath -Times 1
     }
 }

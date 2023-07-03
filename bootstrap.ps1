@@ -250,21 +250,16 @@ Function Install-Scoop {
             Initialize-EnvPath
         }
 
-        # install needed tools
-        Invoke-CommandLine "scoop update"
-        Invoke-CommandLine "scoop install lessmsi" -Silent $true
-
         # Some old tweak to get 7zip installed correctly
         Invoke-CommandLine "scoop config use_lessmsi $true" -Silent $true
 
         # avoid deadlocks while updating scoop buckets
         Invoke-CommandLine "scoop config autostash_on_conflict $true" -Silent $true
 
-        # some prerequisites to install other packages
-        Invoke-CommandLine "scoop install 7zip" -Silent $true
-        Invoke-CommandLine "scoop install innounp" -StopAtError $false -Silent $true
-        Invoke-CommandLine "scoop install dark" -Silent $true
+        # import project-specific scoopfile.json
+        Invoke-CommandLine "scoop update"
         Invoke-CommandLine "scoop import scoopfile.json"
+
         Initialize-EnvPath
     }
     else {
