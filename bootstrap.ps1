@@ -100,7 +100,7 @@ Function Main {
             New-Item -ItemType Directory '.bootstrap'
         }
         # Installation of Scoop, Python and pipenv via bootstrap
-        $bootstrapSource = 'https://raw.githubusercontent.com/avengineers/bootstrap/develop/bootstrap.ps1'
+        $bootstrapSource = 'https://raw.githubusercontent.com/avengineers/bootstrap/main/bootstrap.ps1'
         if ($Env:GITHUB_HEAD_REF){
             $bootstrapSource = "https://raw.githubusercontent.com/avengineers/bootstrap/$Env:GITHUB_HEAD_REF/bootstrap.ps1"
             Write-Output "Downloading bootstrap from $bootstrapSource ..."
@@ -250,15 +250,13 @@ Function Install-Scoop {
             Initialize-EnvPath
         }
 
-        # Some old tweak to get 7zip installed correctly
-        Invoke-CommandLine "scoop config use_lessmsi $true" -Silent $true
-
-        # avoid deadlocks while updating scoop buckets
-        Invoke-CommandLine "scoop config autostash_on_conflict $true" -Silent $true
-
         # import project-specific scoopfile.json
+        # TODO: remove this when PR for reset option is merged
+        Invoke-CommandLine "scoop config scoop_repo https://github.com/xxthunder/Scoop"
+        Invoke-CommandLine "scoop config scoop_branch develop"
+        Invoke-CommandLine "scoop update scoop"
         Invoke-CommandLine "scoop update"
-        Invoke-CommandLine "scoop import scoopfile.json"
+        Invoke-CommandLine "scoop import scoopfile.json --reset"
 
         Initialize-EnvPath
     }
