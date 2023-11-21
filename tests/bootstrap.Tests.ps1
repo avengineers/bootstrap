@@ -167,39 +167,3 @@ Describe "install python deps" {
         Should -Invoke -CommandName New-Item -Times 0
     }
 }
-
-Describe "install west" {
-    BeforeEach {
-        Mock -CommandName Invoke-CommandLine -MockWith {}
-        Mock -CommandName New-Item -MockWith {}
-    }
-
-    It "shall install west if no west config exists" {
-        Mock -CommandName Test-Path -MockWith { $false } -ParameterFilter { $Path -eq '.west/config' }
-
-        Install-West
-
-        Should -Invoke -CommandName Invoke-CommandLine -Times 0
-        Should -Invoke -CommandName New-Item -Times 0
-    }
-
-    It "shall install west if west config exists" {
-        Mock -CommandName Test-Path -MockWith { $true } -ParameterFilter { $Path -eq '.west/config' }
-        Mock -CommandName Test-Path -MockWith { $false } -ParameterFilter { $Path -eq ".venv" }
-
-        Install-West
-
-        Should -Invoke -CommandName Invoke-CommandLine -Times 1
-        Should -Invoke -CommandName New-Item -Times 1
-    }
-
-    It "shall install west if west config exists and .venv exists" {
-        Mock -CommandName Test-Path -MockWith { $true } -ParameterFilter { $Path -eq '.west/config' }
-        Mock -CommandName Test-Path -MockWith { $true } -ParameterFilter { $Path -eq ".venv" }
-
-        Install-West
-
-        Should -Invoke -CommandName Invoke-CommandLine -Times 1
-        Should -Invoke -CommandName New-Item -Times 0
-    }
-}

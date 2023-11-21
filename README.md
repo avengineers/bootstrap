@@ -1,6 +1,6 @@
 # Bootstrap
 
-This repository provides an easy way to setup a Python and/or West based project under Windows.
+This repository provides an easy way to setup a Python based project under Windows.
 
 ## Creation of Initial Project Structure
 
@@ -11,7 +11,7 @@ This repository provides an easy way to setup a Python and/or West based project
   Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope CurrentUser -Force
   ```
 
-* Depending on whether your are behind a proxy or not run the downloaded bootstrap.ps1 with or without the parameter -proxy. (Adapt the command line parameters 'projectDirectory' and 'http://your.proxy.here' to your needs.)
+* Depending on whether your are behind a proxy or not run the downloaded bootstrap.ps1 with or without the parameter -proxy. (Adapt the command line parameters 'projectDirectory' and '<http://your.proxy.here>' to your needs.)
   * With Proxy:
 
     ```powershell
