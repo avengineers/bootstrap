@@ -250,11 +250,12 @@ Function Install-Scoop {
             Initialize-EnvPath
         }
 
-        # import project-specific scoopfile.json
-        # TODO: remove this when PR for reset option is merged
+        # TODO: remove this when PR for reset option is merged or we found another solution for using specific versions of apps
         Invoke-CommandLine "scoop config scoop_repo https://github.com/xxthunder/Scoop"
         Invoke-CommandLine "scoop config scoop_branch develop"
         Invoke-CommandLine "scoop update scoop"
+        
+        # import project-specific scoopfile.json
         Invoke-CommandLine "scoop import scoopfile.json --reset"
 
         Initialize-EnvPath
@@ -291,17 +292,6 @@ Function Install-Python-Dependency {
     }
 }
 
-Function Install-West {
-    if ((Test-Path -Path '.west/config')) {
-        Write-Output "File '.west/config' found, installing 'west' ..."
-        # install west into virtual environment
-        if (-Not (Test-Path -Path '.venv')) {
-            New-Item -ItemType Directory '.venv'
-        }
-        Invoke-CommandLine "python -m pipenv install west"
-    }
-}
-
 Function Main {
     # Same parameters as for the script
     param(
@@ -314,7 +304,6 @@ Function Main {
     else {
         Install-Scoop
         Install-Python-Dependency
-        Install-West
     }
 }
 
