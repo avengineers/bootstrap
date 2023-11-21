@@ -255,7 +255,6 @@ Function Install-Scoop {
         Invoke-CommandLine "scoop config scoop_repo https://github.com/xxthunder/Scoop"
         Invoke-CommandLine "scoop config scoop_branch develop"
         Invoke-CommandLine "scoop update scoop"
-        Invoke-CommandLine "scoop update"
         Invoke-CommandLine "scoop import scoopfile.json --reset"
 
         Initialize-EnvPath
