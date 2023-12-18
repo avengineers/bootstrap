@@ -250,12 +250,19 @@ Function Install-Scoop {
             Initialize-EnvPath
         }
 
-        # TODO: remove this when PR for reset option is merged or we found another solution for using specific versions of apps
+        # Some old tweak to get 7zip installed correctly
+        Invoke-CommandLine "scoop config use_lessmsi $true" -Silent $true
+
+        # avoid deadlocks while updating scoop buckets
+        Invoke-CommandLine "scoop config autostash_on_conflict $true" -Silent $true
+
+        # Update scoop app itself
         Invoke-CommandLine "scoop config scoop_repo https://github.com/xxthunder/Scoop"
         Invoke-CommandLine "scoop config scoop_branch develop"
         Invoke-CommandLine "scoop update scoop"
-        
+
         # import project-specific scoopfile.json
+        # TODO: scoop's import feature is not working properly, do it by yourself
         Invoke-CommandLine "scoop import scoopfile.json --reset"
 
         Initialize-EnvPath
