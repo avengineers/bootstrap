@@ -1,17 +1,17 @@
-# Refactor the Bootstrap
+# Some thoughts about Bootstrap
 
 ## Requirements
 
-* [ ] the powershell code shall be kept at minimum
-* [ ] usage of bootstrap: there shall be one liner of powershell to get the bootstrap script and start it
-* [ ] bootstrap shall be idempotent - it shall not install the same tool again
-* [ ] bootstrap shall keep track of the dependencies and do incremental installs
+* [x] The powershell code shall be kept at minimum.
+* [x] Usage of bootstrap: there shall be "one" liner of powershell to get the bootstrap script and start it.
+* [x] Bootstrap shall be idempotent.
+* [x] Bootstrap shall keep track of the dependencies and do incremental installs.
 * [ ] it should support both on-premise and public dependencies
   * [ ] this means that bootstrap shall also work without internet connection, only intranet
-* [ ] the bootstrap shall create the virtual environment with the python version configured by the user
-* [ ] bootstrap shall run for users without administrative rights
-* [ ] bootstrap shall use semantic versioning
-* [ ] bootstrap shall have a configuration file for the user to define parameters like python version, python package manager, scoop installer, scoop python json base url 
+* [x] the bootstrap shall create the virtual environment with the python version configured by the user
+* [x] bootstrap shall run for users without administrative rights
+* [x] bootstrap shall use semantic versioning
+* [x] bootstrap shall have a configuration file for the user to define parameters like python version, python package manager, scoop installer, scoop python json base url 
 
 
 Why do we need a bootstrap?
@@ -20,7 +20,7 @@ Why do we need a bootstrap?
   * we need it to install all tools a project needs
   * scoop is implemented in powershell
 * powershell - available on all Windows machines
-  * no BAT
+  * no batch
 * python
 
 
