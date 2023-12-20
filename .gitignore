@@ -13,3 +13,5 @@ __pycache__/
 # Environments
 .venv/
 
+# Any log file created
+*.log

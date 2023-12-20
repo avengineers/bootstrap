@@ -57,28 +57,31 @@ Describe "invoking command line calls" {
 
 Describe "install scoop" {
     BeforeEach {
-        Mock -CommandName Invoke-Expression -MockWith {}
+        Mock -CommandName Invoke-RestMethod -MockWith { 
+            New-Item -Path $OutFile -ItemType File
+        }
         Mock -CommandName Invoke-CommandLine -MockWith {}
         Mock -CommandName Initialize-EnvPath -MockWith {}
     }
 
-    It "shall not run scoop if no scoopfile exists" {
-        Mock -CommandName Test-Path -MockWith { $false }
-
-        Install-Scoop
-        Should -Invoke -CommandName Invoke-Expression -Times 0
-        Should -Invoke -CommandName Invoke-CommandLine -Times 0
-        Should -Invoke -CommandName Initialize-EnvPath -Times 0
-    }
-
-    It "shall run scoop if scoopfile exists" {
-        Mock -CommandName Test-Path -MockWith { $true }
+    It "shall not install scoop if scoop is already available" {
         Mock -CommandName Get-Command -MockWith { $true }
 
         Install-Scoop
-        Should -Invoke -CommandName Invoke-CommandLine -Times 4
+        Should -Invoke -CommandName Invoke-RestMethod -Times 0
+        Should -Invoke -CommandName Invoke-CommandLine -Times 5
+        Should -Invoke -CommandName Initialize-EnvPath -Times 0
+    }
+
+    It "shall install scoop if scoop is not available" {
+        Mock -CommandName Get-Command -MockWith { $false }
+
+        Install-Scoop
+        Should -Invoke -CommandName Invoke-RestMethod -Times 1
+        Should -Invoke -CommandName Invoke-CommandLine -Times 3
         Should -Invoke -CommandName Initialize-EnvPath -Times 1
     }
+
 }
 
 Describe "install python deps" {

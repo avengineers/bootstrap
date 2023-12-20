@@ -1,60 +1,58 @@
 name: CI
 
 on:
-   push:
-      branches: [main, develop]
-   pull_request:
-      branches: [main, develop]
+    push:
+        branches: [main, develop]
+    pull_request:
+        branches: [main, develop]
 
-   workflow_dispatch:
+    workflow_dispatch:
 
 jobs:
-   test_pwsh:
-      name: Unit and Integration Tests (Powershell 7.x)
-      runs-on: windows-latest
-      steps:
-         - name: Checkout
-           uses: actions/checkout@v3
-           with:
-              submodules: true
-         - name: install tools and run Pester
-           run: |
-              Write-Output $PSVersionTable
-              .\tests\bin\init.ps1
-              .\tests\bin\test.ps1
-           shell: pwsh
-         - name: Publish Test Results
-           uses: EnricoMi/publish-unit-test-result-action/composite@v2
-           if: always()
-           with:
-              files: |
-                 tests/out/TestResults.xml
-         - name: run bootstrap and pytest
-           env:
-              # Workaround to force usage of scoop apps installed in USERPROFILE.
-              USER_PATH_FIRST: 1
-           run: |
-              .\bootstrap.ps1
-              .\.venv\Scripts\poetry run pytest
-           shell: pwsh
-   test_powershell:
-      name: Unit and Integration Tests (Powershell 5.x)
-      runs-on: windows-latest
-      steps:
-         - name: Checkout
-           uses: actions/checkout@v3
-           with:
-              submodules: true
-         - name: install tools and run Pester
-           run: |
-              Write-Output $PSVersionTable
-              .\tests\bin\init.ps1
-              .\tests\bin\test.ps1
-           shell: powershell
-         - name: run bootstrap and pytest
-           env:
-              # Workaround to force usage of scoop apps installed in USERPROFILE.
-              USER_PATH_FIRST: 1
-           run: |
-              .\bootstrap.ps1
-              .\.venv\Scripts\poetry run pytest
+    test_pwsh:
+        name: Unit and Integration Tests (Powershell 7.x)
+        runs-on: windows-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+            - name: install tools and run Pester
+              run: |
+                  Write-Output $PSVersionTable
+                  .\tests\bin\init.ps1
+                  .\tests\bin\test.ps1
+              shell: pwsh
+            - name: Publish Test Results
+              uses: EnricoMi/publish-unit-test-result-action/composite@v2
+              if: always()
+              with:
+                  files: |
+                      tests/out/TestResults.xml
+            - name: run bootstrap and pytest
+              env:
+                  # Workaround to force usage of scoop apps installed in USERPROFILE.
+                  USER_PATH_FIRST: 1
+              run: |
+                  .\bootstrap.ps1
+                  .\.venv\Scripts\poetry run pytest
+              shell: pwsh
+    test_powershell:
+        name: Unit and Integration Tests (Powershell 5.x)
+        runs-on: windows-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v3
+              with:
+                  submodules: true
+            - name: install tools and run Pester
+              run: |
+                  Write-Output $PSVersionTable
+                  .\tests\bin\init.ps1
+                  .\tests\bin\test.ps1
+              shell: powershell
+            - name: run bootstrap and pytest
+              env:
+                  # Workaround to force usage of scoop apps installed in USERPROFILE.
+                  USER_PATH_FIRST: 1
+              run: |
+                  .\bootstrap.ps1
+                  .\.venv\Scripts\poetry run pytest

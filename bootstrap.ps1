@@ -3,13 +3,38 @@
     Wrapper for installing dependencies of a project
 #>
 
-## start of script
 # Always set the $InformationPreference variable to "Continue" globally,
 # this way it gets printed on execution and continues execution afterwards.
 $InformationPreference = "Continue"
 
 # Stop on first error
 $ErrorActionPreference = "Stop"
+
+###################################################################################################
+# Configuration
+###################################################################################################
+$bootstrapJsonPath = "bootstrap.json"
+if (Test-Path $bootstrapJsonPath) {
+    $json = Get-Content $bootstrapJsonPath | ConvertFrom-Json
+    $config = @{
+        pythonVersion             = $json.python_version
+        scoopInstaller            = $json.scoop_installer
+        scoopDefaultBucketBaseUrl = $json.scoop_default_bucket_base_url
+        scoopPythonBucketBaseUrl  = $json.scoop_python_bucket_base_url
+    }
+}
+else {
+    $config = @{
+        pythonVersion             = "3.10"
+        scoopInstaller            = "https://raw.githubusercontent.com/ScoopInstaller/Install/master/install.ps1"
+        scoopDefaultBucketBaseUrl = "https://raw.githubusercontent.com/ScoopInstaller/Main/master/bucket"
+        scoopPythonBucketBaseUrl  = "https://raw.githubusercontent.com/ScoopInstaller/Versions/master/bucket"
+    }
+}
+
+###################################################################################################
+# Utility functions
+###################################################################################################
 
 # Update/Reload current environment variable PATH with settings from registry
 Function Initialize-EnvPath {
@@ -36,53 +61,65 @@ Function Invoke-CommandLine {
         Write-Output "Executing: $CommandLine"
     }
     $global:LASTEXITCODE = 0
-    Invoke-Expression $CommandLine
+    if ($Silent) {
+        Invoke-Expression $CommandLine *>$null
+    }
+    else {
+        Invoke-Expression $CommandLine
+    }
     if ($global:LASTEXITCODE -ne 0) {
         if ($StopAtError) {
             Write-Error "Command line call `"$CommandLine`" failed with exit code $global:LASTEXITCODE"
         }
         else {
-            if (-Not $Silent) {
-                Write-Output "Command line call `"$CommandLine`" failed with exit code $global:LASTEXITCODE, continuing ..."
-            }
+            Write-Output "Command line call `"$CommandLine`" failed with exit code $global:LASTEXITCODE, continuing ..."
         }
     }
 }
 
 Function Install-Scoop {
-    if (Test-Path -Path 'scoopfile.json') {
-        Write-Output "File 'scoopfile.json' found, installing scoop and running 'scoop import' ..."
-        # Initial Scoop installation
-        if (-Not (Get-Command 'scoop' -ErrorAction SilentlyContinue)) {
-            Invoke-RestMethod 'https://raw.githubusercontent.com/ScoopInstaller/Install/master/install.ps1' -outfile "$PSScriptRoot\bootstrap.scoop.ps1"
-            if ((New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-                & $PSScriptRoot\bootstrap.scoop.ps1 -RunAsAdmin
-            }
-            else {
-                & $PSScriptRoot\bootstrap.scoop.ps1
-            }
-            Initialize-EnvPath
+    # Initial Scoop installation
+    if (-Not (Get-Command 'scoop' -ErrorAction SilentlyContinue)) {
+        $tempDir = [System.IO.Path]::GetTempPath()
+        $tempFile = "$tempDir\install.ps1"
+        Invoke-RestMethod $config.scoopInstaller -OutFile $tempFile
+        if ((New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+            & $tempFile -RunAsAdmin
         }
+        else {
+            & $tempFile
+        }
+        Remove-Item $tempFile
+        Initialize-EnvPath
+    }
 
-        # Some old tweak to get 7zip installed correctly
-        Invoke-CommandLine "scoop config use_lessmsi $true" -Silent $true
+    # Some old tweak to get 7zip installed correctly
+    Invoke-CommandLine "scoop config use_lessmsi $true" -Silent $true
 
-        # avoid deadlocks while updating scoop buckets
-        Invoke-CommandLine "scoop config autostash_on_conflict $true" -Silent $true
+    # avoid deadlocks while updating scoop buckets
+    Invoke-CommandLine "scoop config autostash_on_conflict $true" -Silent $true
 
-        # Update scoop app itself
-        Invoke-CommandLine "scoop config scoop_repo https://github.com/xxthunder/Scoop"
-        Invoke-CommandLine "scoop config scoop_branch develop"
-        Invoke-CommandLine "scoop update scoop"
+    # Install any installer dependencies
+    $manifests = @(
+        "$($config.scoopDefaultBucketBaseUrl)/dark.json",
+        "$($config.scoopDefaultBucketBaseUrl)/lessmsi.json",
+        "$($config.scoopDefaultBucketBaseUrl)/innounp.json",
+        "$($config.scoopDefaultBucketBaseUrl)/7zip.json"
+    )
+    $manifests | ForEach-Object {
+        Invoke-CommandLine "scoop install $_" -Silent $true
+    }
+
+    if (Test-Path -Path 'scoopfile.json') {
+        Write-Output "File 'scoopfile.json' found, running 'scoop import' ..."
+
+        Invoke-CommandLine "scoop update"
 
         # import project-specific scoopfile.json
         # TODO: scoop's import feature is not working properly, do it by yourself
         Invoke-CommandLine "scoop import scoopfile.json --reset"
 
         Initialize-EnvPath
-    }
-    else {
-        Write-Output "File 'scoopfile.json' not found, skipping Scoop setup."
     }
 }
 
@@ -116,13 +153,37 @@ Function Install-PythonEnvironment {
         Write-Output "No Python config file found, skipping Python setup."
     }
 }
+Function Install-Python {
+    # python executable name
+    $python = "python" + $config.pythonVersion.Replace(".", "")
+
+    # Check if python is installed
+    $pythonPath = (Get-Command $python -ErrorAction SilentlyContinue).Source
+    if ($null -eq $pythonPath) {
+        Write-Output "$python not found. Try to install $python via scoop ..."
+        # Install python
+        Invoke-CommandLine "scoop install $($config.scoopPythonBucketBaseUrl)/$python.json"
+    }
+    else {
+        Write-Output "$python found in $pythonPath"
+        # Extract the directory of python exe file and add it to PATH. It needs to be the first entry in PATH
+        # such that this version is used when the user calls python and not python311
+        $pythonDir = [System.IO.Path]::GetDirectoryName($pythonPath)
+        Write-Output "Adding $pythonDir to PATH"
+        $Env:Path += ";$pythonDir"
+    }
+}
+
 
 # Main function needed for testing (will be mocked)
 Function Main {
     Install-Scoop
+    Install-Python
     Install-PythonEnvironment
 }
 
 ## start of script
+
 Main
+
 ## end of script
