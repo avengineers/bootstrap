@@ -23,6 +23,13 @@ jobs:
           .\tests\bin\init.ps1
           .\tests\bin\test.ps1
         shell: pwsh
+      - name: Upload log file
+        uses: actions/upload-artifact@v2
+        with:
+          name: "pwsh-logs"
+          retention-days: 90
+          path: "**/bootstrap.log"
+          if-no-files-found: error
       - name: Publish Test Results
         uses: EnricoMi/publish-unit-test-result-action/composite@v2
         if: always()
@@ -43,3 +50,11 @@ jobs:
           .\tests\bin\init.ps1
           .\tests\bin\test.ps1
         shell: powershell
+      - name: Upload log file
+        uses: actions/upload-artifact@v2
+        with:
+          name: "powershell-logs"
+          retention-days: 90
+          path: "**/bootstrap.log"
+          if-no-files-found: error
+      

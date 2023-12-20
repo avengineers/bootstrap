@@ -315,5 +315,10 @@ Function Main {
 }
 
 ## start of script
+$LogPath = Join-Path -Path $PSScriptRoot -ChildPath "$($MyInvocation.MyCommand.Name.Replace('.ps1','')).log"
+Start-Transcript -Path $LogPath
+
 Main @PSBoundParameters
+
+Stop-Transcript
 ## end of script
