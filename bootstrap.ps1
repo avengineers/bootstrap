@@ -242,14 +242,13 @@ Function Install-Scoop {
         if (-Not (Get-Command 'scoop' -ErrorAction SilentlyContinue)) {
             $scoopInstallerSource = 'https://raw.githubusercontent.com/xxthunder/ScoopInstall/master/install.ps1'
             $scoopInstallerFile = Join-Path -Path $PSScriptRoot -ChildPath 'bootstrap.scoop.ps1'
+            $scoopInstallerArgs = ""
             Write-Output "Downloading scoop installer from $scoopInstallerSource ..."
             Invoke-RestMethod $scoopInstallerSource -OutFile $scoopInstallerFile
             if ((New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-                & $scoopInstallerFile -RunAsAdmin
+                $scoopInstallerArgs = " -RunAsAdmin"
             }
-            else {
-                & $scoopInstallerFile
-            }
+            & $scoopInstallerFile $scoopInstallerArgs
             Initialize-EnvPath
         }
 
