@@ -240,12 +240,15 @@ Function Install-Scoop {
         Write-Output "File 'scoopfile.json' found, installing scoop and running 'scoop import' ..."
         # Initial Scoop installation
         if (-Not (Get-Command 'scoop' -ErrorAction SilentlyContinue)) {
-            Invoke-RestMethod 'https://raw.githubusercontent.com/ScoopInstaller/Install/master/install.ps1' -outfile "$PSScriptRoot\bootstrap.scoop.ps1"
+            $scoopInstallerSource = 'https://raw.githubusercontent.com/xxthunder/ScoopInstall/master/install.ps1'
+            $scoopInstallerFile = Join-Path -Path $PSScriptRoot -ChildPath 'bootstrap.scoop.ps1'
+            Write-Output "Downloading scoop installer from $scoopInstallerSource ..."
+            Invoke-RestMethod $scoopInstallerSource -OutFile $scoopInstallerFile
             if ((New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-                & $PSScriptRoot\bootstrap.scoop.ps1 -RunAsAdmin
+                & $scoopInstallerFile -RunAsAdmin
             }
             else {
-                & $PSScriptRoot\bootstrap.scoop.ps1
+                & $scoopInstallerFile
             }
             Initialize-EnvPath
         }
@@ -256,13 +259,11 @@ Function Install-Scoop {
         # avoid deadlocks while updating scoop buckets
         Invoke-CommandLine "scoop config autostash_on_conflict $true" -Silent $true
 
-        # Update scoop app itself
+        # import project-specific scoopfile.json
+        # TODO: scoop's import feature is not working properly, do it by yourself
         Invoke-CommandLine "scoop config scoop_repo https://github.com/xxthunder/Scoop"
         Invoke-CommandLine "scoop config scoop_branch develop"
         Invoke-CommandLine "scoop update scoop"
-
-        # import project-specific scoopfile.json
-        # TODO: scoop's import feature is not working properly, do it by yourself
         Invoke-CommandLine "scoop import scoopfile.json --reset"
 
         Initialize-EnvPath

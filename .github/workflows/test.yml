@@ -19,16 +19,15 @@ jobs:
           submodules: true
       - name: install tools and run selftests
         run: |
-          Write-Output $PSVersionTable
           .\tests\bin\init.ps1
           .\tests\bin\test.ps1
         shell: pwsh
       - name: Upload log file
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: "pwsh-logs"
           retention-days: 90
-          path: "**/bootstrap.log"
+          path: "**/*.log"
           if-no-files-found: error
       - name: Publish Test Results
         uses: EnricoMi/publish-unit-test-result-action/composite@v2
@@ -46,15 +45,14 @@ jobs:
           submodules: true
       - name: install tools and run selftests
         run: |
-          Write-Output $PSVersionTable
           .\tests\bin\init.ps1
           .\tests\bin\test.ps1
         shell: powershell
       - name: Upload log file
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: "powershell-logs"
           retention-days: 90
-          path: "**/bootstrap.log"
+          path: "**/*.log"
           if-no-files-found: error
       
