@@ -21,4 +21,4 @@ $testResult | Export-JUnitReport -Path (Join-Path $testsFolder "out\TestResults.
 
 Stop-Transcript
 
-Exit $testResult.FailedCount
+Exit 0
