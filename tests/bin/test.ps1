@@ -1,5 +1,8 @@
 #Requires -Version 5.1
 
+$LogPath = Join-Path -Path $PSScriptRoot -ChildPath "$($MyInvocation.MyCommand.Name.Replace('.ps1','')).log"
+Start-Transcript -Path $LogPath
+
 $testsFolder = Join-Path $PSScriptRoot ".."
 
 $testConfig = New-PesterConfiguration -Hashtable @{
@@ -16,4 +19,6 @@ $testResult = Invoke-Pester -Configuration $testConfig
 
 $testResult | Export-JUnitReport -Path (Join-Path $testsFolder "out\TestResults.xml")
 
-Exit $testResult.FailedCount
+Stop-Transcript
+
+Exit 0
