@@ -272,9 +272,13 @@ Function Install-Scoop {
     }
 }
 
+# Prepare virtual Python environment
 Function Install-Python-Dependency {
-    # Prepare virtual Python environment
-    if ((Test-Path -Path 'requirements.txt') -or (Test-Path -Path 'Pipfile')) {
+    if (Test-Path -Path 'pyproject.toml') {
+        $bootstrapPy = Join-Path $PSScriptRoot "bootstrap.py"
+        Invoke-CommandLine "python $bootstrapPy"
+    }
+    elseif ((Test-Path -Path 'requirements.txt') -or (Test-Path -Path 'Pipfile')) {
         Invoke-CommandLine "python -m pip install pipenv pip-system-certs"
         if ($clean) {
             # Start with a fresh virtual environment
@@ -295,7 +299,7 @@ Function Install-Python-Dependency {
         }
     }
     else {
-        Write-Output "File 'Pipfile' not found, skipping Python setup."
+        Write-Output "No Python config file found, skipping Python setup."
     }
 }
 
