@@ -1,1 +1,15 @@
+# Output directory of tests
 /tests/out
+
+# bootstrap files are downloaded during installation
+/bootstrap.scoop.ps1
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+/.pytest_cache
+*.py[cod]
+*$py.class
+
+# Environments
+.venv/
+

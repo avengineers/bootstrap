@@ -1,0 +1,20 @@
+ [tool.poetry]
+name = "bootstrap"
+version = "0.1.0"
+description = "Initial tool installation for a python project"
+authors = ["Avengineers <karsten.guenther@kamg.de>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.0"
+pytest-cov = "^4.0"
+ruff = "^0.3.0"
+pytest-mock = "^3.3"
+
+[tool.pytest.ini_options]
+addopts = "-v -Wdefault"
+testpaths = "tests/"

@@ -1,0 +1,30 @@
+{
+    "buckets": [
+        {
+            "Name": "main",
+            "Source": "https://github.com/ScoopInstaller/Main"
+        },
+        {
+            "Name": "versions",
+            "Source": "https://github.com/ScoopInstaller/Versions"
+        }
+    ],
+    "apps": [
+        {
+            "Source": "main",
+            "Name": "dark"
+        },
+        {
+            "Source": "main",
+            "Name": "innounp"
+        },
+        {
+            "Source": "main",
+            "Name": "lessmsi"
+        },
+        {
+            "Source": "versions",
+            "Name": "python311"
+        }
+    ]
+}
