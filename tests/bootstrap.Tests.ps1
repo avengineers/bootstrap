@@ -7,49 +7,6 @@ BeforeAll {
     Remove-Item Alias:Main
 }
 
-Describe "Initialize a new project directory" {
-    BeforeEach {
-        # Prepare test output folder
-        $testData = Join-Path $PSScriptRoot 'out\bootstrap\init'
-        if (Test-Path $testData) {
-            Remove-Item $testData -Recurse -Force
-        }
-    }
-
-    It "Shall create project directory and files" {
-        Initialize-Directory $testData
-
-        Test-Path (Join-Path $testData 'build.bat') | Should -Be $true
-        Test-Path (Join-Path $testData 'build.ps1') | Should -Be $true
-        Test-Path (Join-Path $testData 'scoopfile.json') | Should -Be $true
-    }
-
-    It "Shall create directory with proxy config" {
-        Initialize-Directory $testData "http://someproxy"
-
-        Test-Path $testData | Should -Be $true
-        Test-Path (Join-Path $testData '.env') | Should -Be $true
-        (Join-Path $testData '.env') | Should -FileContentMatch 'HTTPS_PROXY=http://someproxy'
-    }
-}
-
-Describe "Create a file with confirmation" {
-    BeforeAll {
-        $testData = Join-Path $PSScriptRoot 'out\bootstrap\fileCreate'
-        # Remove any created test data
-        if (Test-Path $testData) {
-            Remove-Item $testData -Recurse -Force
-        }
-    }
-    It "Shall create a file" {
-        $testFile = Join-Path $testData 'someFile'
-
-        Initialize-File-With-Confirmation $testFile "some content to be written into that file"
-
-        Test-Path $testFile | Should -Be $true
-    }
-}
-
 Describe "invoking command line calls" {
     BeforeEach {
         Mock -CommandName Write-Output -MockWith {}
@@ -132,7 +89,7 @@ Describe "install python deps" {
     It "shall not run python deps installation if no deps are given" {
         Mock -CommandName Test-Path -MockWith { $false }
 
-        Install-Python-Dependency
+        Install-PythonEnvironment
         Should -Invoke -CommandName Invoke-CommandLine -Times 0
     }
 
@@ -141,7 +98,7 @@ Describe "install python deps" {
         Mock -CommandName Test-Path -MockWith { $false }
         Mock -CommandName Test-Path -MockWith { $true } -ParameterFilter { $Path -eq "requirements.txt" }
 
-        Install-Python-Dependency
+        Install-PythonEnvironment
         Should -Invoke -CommandName Invoke-CommandLine -Times 2
         Should -Invoke -CommandName New-Item -Times 1
     }
@@ -151,7 +108,7 @@ Describe "install python deps" {
         Mock -CommandName Test-Path -MockWith { $false }
         Mock -CommandName Test-Path -MockWith { $true } -ParameterFilter { $Path -eq "Pipfile" }
 
-        Install-Python-Dependency
+        Install-PythonEnvironment
         Should -Invoke -CommandName Invoke-CommandLine -Times 2
         Should -Invoke -CommandName New-Item -Times 1
     }
@@ -162,7 +119,7 @@ Describe "install python deps" {
         Mock -CommandName Test-Path -MockWith { $true } -ParameterFilter { $Path -eq ".venv" }
         Mock -CommandName Test-Path -MockWith { $true } -ParameterFilter { $Path -eq "Pipfile" }
 
-        Install-Python-Dependency
+        Install-PythonEnvironment
         Should -Invoke -CommandName Invoke-CommandLine -Times 1
         Should -Invoke -CommandName New-Item -Times 0
     }
