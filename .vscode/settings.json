@@ -1,5 +1,10 @@
 {
-   "pester.autoRunOnSave": false,
+   "python.testing.pytestEnabled": true,
+   "python.testing.unittestEnabled": false,
+   "python.analysis.extraPaths": [
+      "src",
+      "tests"
+   ],
    "workbench.colorCustomizations": {
       "activityBar.activeBackground": "#ff6433",
       "activityBar.background": "#ff6433",
