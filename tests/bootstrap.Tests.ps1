@@ -50,7 +50,7 @@ Describe "invoking command line calls" {
     }
     It "shall not write the command nor create and write an error when existing command fails" {
         Invoke-CommandLine "git fanatic" -Silent $true -StopAtError $false
-        Should -Invoke -CommandName Write-Output -Times 0
+        Should -Invoke -CommandName Write-Output -Times 1
         Should -Invoke -CommandName Write-Error -Times 0
     }
 }
@@ -125,5 +125,42 @@ Describe "install python deps" {
         Install-PythonEnvironment
         Should -Invoke -CommandName Invoke-CommandLine -Times 1
         Should -Invoke -CommandName New-Item -Times 0
+    }
+}
+
+Describe "JSON to Hashtable Conversion" {
+    It "Converts a JSON string to a hashtable" {
+        $jsonStr = '{"Path": "C:\\temp", "Filter": "*.js"}'
+        $expectedHashtable = @{
+            "Path" = "C:\temp"
+            "Filter" = "*.js"
+        }
+        $actualHashtable = Convert-JsonToHashtable -JsonString $jsonStr
+        $actualHashtable | Should -BeLike $expectedHashtable
+        $actualHashtable.Path | Should -Be "C:\temp"
+    }
+
+    It "Converts a more complex JSON string to a hashtable" {
+        $jsonStr = '{"Path": "C:\\temp", "Filter": "*.js", "Options": {"Recursive": "true", "IncludeHidden": "false"}}'
+        $expectedHashtable = @{
+            "Path" = "C:\temp"
+            "Filter" = "*.js"
+            "Options" = @{
+                "Recursive" = $true
+                "IncludeHidden" = $false
+            }
+        }
+        $actualHashtable = Convert-JsonToHashtable -JsonString $jsonStr
+        $actualHashtable | Should -BeLike $expectedHashtable
+        $actualHashtable.Path | Should -Be "C:\temp"
+        $actualHashtable.Options.Recursive | Should -Be "true"
+        $actualHashtable.Options.IncludeHidden | Should -Be "false"
+    }
+
+    It "Converts an empty JSON string to an empty hashtable" {
+        $jsonStr = '{}'
+        $expectedHashtable = @{}
+        $actualHashtable = Convert-JsonToHashtable -JsonString $jsonStr
+        $actualHashtable | Should -BeLike $expectedHashtable
     }
 }

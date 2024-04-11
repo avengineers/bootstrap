@@ -13,22 +13,44 @@ $ErrorActionPreference = "Stop"
 ###################################################################################################
 # Configuration
 ###################################################################################################
+
+function Convert-JsonToHashtable {
+    param (
+        [Parameter(Mandatory = $true, Position = 0)]
+        [AllowEmptyString()]
+        [string]$JsonString
+    )
+
+    # Convert the JSON string to a PSCustomObject
+    $customObject = $JsonString | ConvertFrom-Json
+
+    # Create an empty hashtable
+    $hashtable = @{}
+
+    # Iterate through the properties of the PSCustomObject
+    $customObject.psobject.properties | ForEach-Object {
+        $hashtable[$_.Name] = $_.Value
+    }
+
+    # Return the hashtable
+    return $hashtable
+}
+
 $bootstrapJsonPath = "bootstrap.json"
 if (Test-Path $bootstrapJsonPath) {
-    $json = Get-Content $bootstrapJsonPath | ConvertFrom-Json
-    $config = @{
-        pythonVersion             = $json.python_version
-        scoopInstaller            = $json.scoop_installer
-        scoopDefaultBucketBaseUrl = $json.scoop_default_bucket_base_url
-        scoopPythonBucketBaseUrl  = $json.scoop_python_bucket_base_url
-    }
+    $json = Get-Content $bootstrapJsonPath | Out-String
+    $config = Convert-JsonToHashtable -JsonString $json
 }
 else {
     $config = @{
-        pythonVersion             = "3.10"
-        scoopInstaller            = "https://raw.githubusercontent.com/ScoopInstaller/Install/master/install.ps1"
-        scoopDefaultBucketBaseUrl = "https://raw.githubusercontent.com/ScoopInstaller/Main/master/bucket"
-        scoopPythonBucketBaseUrl  = "https://raw.githubusercontent.com/ScoopInstaller/Versions/master/bucket"
+        python_version                = "3.11"
+        scoop_installer               = "https://raw.githubusercontent.com/ScoopInstaller/Install/master/install.ps1"
+        scoop_default_bucket_base_url = "https://raw.githubusercontent.com/ScoopInstaller/Main/master/bucket"
+        scoop_python_bucket_base_url  = "https://raw.githubusercontent.com/ScoopInstaller/Versions/master/bucket"
+        scoop_config                  = @{
+            use_lessmsi           = $true
+            autostash_on_conflict = $true
+        }
     }
 }
 
@@ -82,7 +104,7 @@ Function Install-Scoop {
     if (-Not (Get-Command 'scoop' -ErrorAction SilentlyContinue)) {
         $tempDir = [System.IO.Path]::GetTempPath()
         $tempFile = "$tempDir\install.ps1"
-        Invoke-RestMethod $config.scoopInstaller -OutFile $tempFile
+        Invoke-RestMethod $config.scoop_installer -OutFile $tempFile
         if ((New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
             & $tempFile -RunAsAdmin
         }
@@ -93,21 +115,22 @@ Function Install-Scoop {
         Initialize-EnvPath
     }
 
-    # Some old tweak to get 7zip installed correctly
-    Invoke-CommandLine "scoop config use_lessmsi $true" -Silent $true
-
-    # avoid deadlocks while updating scoop buckets
-    Invoke-CommandLine "scoop config autostash_on_conflict $true" -Silent $true
+    if ($config.scoop_config) {
+        Write-Output "Setting scoop configuration ..."
+        $config.scoop_config.PSObject.Properties | ForEach-Object {
+            Write-Output "scoop config $_"
+        }
+    }
 
     # Install any installer dependencies
     $manifests = @(
-        "$($config.scoopDefaultBucketBaseUrl)/dark.json",
-        "$($config.scoopDefaultBucketBaseUrl)/lessmsi.json",
-        "$($config.scoopDefaultBucketBaseUrl)/innounp.json",
-        "$($config.scoopDefaultBucketBaseUrl)/7zip.json"
+        "$($config.scoop_default_bucket_base_url)/dark.json",
+        "$($config.scoop_default_bucket_base_url)/lessmsi.json",
+        "$($config.scoop_default_bucket_base_url)/innounp.json",
+        "$($config.scoop_default_bucket_base_url)/7zip.json"
     )
     $manifests | ForEach-Object {
-        Invoke-CommandLine "scoop install $_" -Silent $true
+        Invoke-CommandLine "scoop install $_" -Silent $false
     }
 
     if (Test-Path -Path 'scoopfile.json') {
@@ -155,14 +178,14 @@ Function Install-PythonEnvironment {
 }
 Function Install-Python {
     # python executable name
-    $python = "python" + $config.pythonVersion.Replace(".", "")
+    $python = "python" + $config.python_version.Replace(".", "")
 
     # Check if python is installed
     $pythonPath = (Get-Command $python -ErrorAction SilentlyContinue).Source
     if ($null -eq $pythonPath) {
         Write-Output "$python not found. Try to install $python via scoop ..."
         # Install python
-        Invoke-CommandLine "scoop install $($config.scoopPythonBucketBaseUrl)/$python.json"
+        Invoke-CommandLine "scoop install $($config.scoop_python_bucket_base_url)/$python.json"
     }
     else {
         Write-Output "$python found in $pythonPath"
@@ -178,8 +201,8 @@ Function Install-Python {
 # Main function needed for testing (will be mocked)
 Function Main {
     Install-Scoop
-    Install-Python
-    Install-PythonEnvironment
+    #Install-Python
+    #Install-PythonEnvironment
 }
 
 ## start of script
