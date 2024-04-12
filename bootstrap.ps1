@@ -3,60 +3,24 @@
     Wrapper for installing dependencies of a project
 #>
 
-# Always set the $InformationPreference variable to "Continue" globally,
-# this way it gets printed on execution and continues execution afterwards.
-$InformationPreference = "Continue"
-
-# Stop on first error
-$ErrorActionPreference = "Stop"
-
-###################################################################################################
-# Configuration
-###################################################################################################
-
-function Convert-JsonToHashtable {
+function Convert-CustomObjectToHashtable {
     param (
         [Parameter(Mandatory = $true, Position = 0)]
         [AllowEmptyString()]
-        [string]$JsonString
+        [PSCustomObject]$CustomObject
     )
-
-    # Convert the JSON string to a PSCustomObject
-    $customObject = $JsonString | ConvertFrom-Json
 
     # Create an empty hashtable
     $hashtable = @{}
 
     # Iterate through the properties of the PSCustomObject
-    $customObject.psobject.properties | ForEach-Object {
+    $CustomObject.psobject.properties | ForEach-Object {
         $hashtable[$_.Name] = $_.Value
     }
 
     # Return the hashtable
     return $hashtable
 }
-
-$bootstrapJsonPath = "bootstrap.json"
-if (Test-Path $bootstrapJsonPath) {
-    $json = Get-Content $bootstrapJsonPath | Out-String
-    $config = Convert-JsonToHashtable -JsonString $json
-}
-else {
-    $config = @{
-        python_version                = "3.11"
-        scoop_installer               = "https://raw.githubusercontent.com/ScoopInstaller/Install/master/install.ps1"
-        scoop_default_bucket_base_url = "https://raw.githubusercontent.com/ScoopInstaller/Main/master/bucket"
-        scoop_python_bucket_base_url  = "https://raw.githubusercontent.com/ScoopInstaller/Versions/master/bucket"
-        scoop_config                  = @{
-            use_lessmsi           = $true
-            autostash_on_conflict = $true
-        }
-    }
-}
-
-###################################################################################################
-# Utility functions
-###################################################################################################
 
 # Update/Reload current environment variable PATH with settings from registry
 Function Initialize-EnvPath {
@@ -84,7 +48,8 @@ Function Invoke-CommandLine {
     }
     $global:LASTEXITCODE = 0
     if ($Silent) {
-        Invoke-Expression $CommandLine *>$null
+        # Omit information stream (6) and stdout (1)
+        Invoke-Expression $CommandLine 6>&1 | Out-Null
     }
     else {
         Invoke-Expression $CommandLine
@@ -100,11 +65,10 @@ Function Invoke-CommandLine {
 }
 
 Function Install-Scoop {
-    # Initial Scoop installation
     if (-Not (Get-Command 'scoop' -ErrorAction SilentlyContinue)) {
         $tempDir = [System.IO.Path]::GetTempPath()
         $tempFile = "$tempDir\install.ps1"
-        Invoke-RestMethod $config.scoop_installer -OutFile $tempFile
+        Invoke-RestMethod -Uri $config.scoop_installer -OutFile $tempFile
         if ((New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
             & $tempFile -RunAsAdmin
         }
@@ -115,31 +79,29 @@ Function Install-Scoop {
         Initialize-EnvPath
     }
 
-    if ($config.scoop_config) {
-        Write-Output "Setting scoop configuration ..."
-        $config.scoop_config.PSObject.Properties | ForEach-Object {
-            Write-Output "scoop config $_"
-        }
+    Write-Output "Applying scoop configuration"
+    foreach ($item in $scoop_config.GetEnumerator()) {
+        Invoke-CommandLine ("scoop config " + $item.Key + " " + $item.Value) -Silent $true
     }
 
     # Install any installer dependencies
     $manifests = @(
-        "$($config.scoop_default_bucket_base_url)/dark.json",
-        "$($config.scoop_default_bucket_base_url)/lessmsi.json",
-        "$($config.scoop_default_bucket_base_url)/innounp.json",
-        "$($config.scoop_default_bucket_base_url)/7zip.json"
+        "dark.json",
+        "lessmsi.json",
+        "innounp.json",
+        "7zip.json"
     )
     $manifests | ForEach-Object {
-        Invoke-CommandLine "scoop install $_" -Silent $false
+        Invoke-CommandLine "scoop install $($config.scoop_default_bucket_base_url)/$_" -Silent $true
     }
 
-    if (Test-Path -Path 'scoopfile.json') {
+    # Import scoopfile.json
+    if ((-Not $config.scoop_ignore_scoopfile) -and (Test-Path -Path 'scoopfile.json')) {
         Write-Output "File 'scoopfile.json' found, running 'scoop import' ..."
 
         Invoke-CommandLine "scoop update"
 
-        # import project-specific scoopfile.json
-        # TODO: scoop's import feature is not working properly, do it by yourself
+        # TODO: scoop's import feature is not working properly, do it with our ScoopWrapper in Pypeline
         Invoke-CommandLine "scoop import scoopfile.json --reset"
 
         Initialize-EnvPath
@@ -148,27 +110,23 @@ Function Install-Scoop {
 
 # Prepare virtual Python environment
 Function Install-PythonEnvironment {
-    if (Test-Path -Path 'pyproject.toml') {
-        $bootstrapPy = Join-Path $PSScriptRoot "bootstrap.py"
-        Invoke-CommandLine "python $bootstrapPy"
-    }
-    elseif ((Test-Path -Path 'requirements.txt') -or (Test-Path -Path 'Pipfile')) {
-        Invoke-CommandLine "python -m pip install pipenv pip-system-certs"
+    if ((Test-Path -Path 'pyproject.toml') -or (Test-Path -Path 'Pipfile')) {
         if ($clean) {
             # Start with a fresh virtual environment
             if (Test-Path -Path '.venv') {
-                Invoke-CommandLine "python -m pipenv --rm" -StopAtError $false
+                Remove-Item -Path '.venv' -Recurse -Force
             }
         }
-        if (-Not (Test-Path -Path '.venv')) {
+        if (-Not (Test-Path -Path '.venv' -PathType Container)) {
             New-Item -ItemType Directory '.venv'
         }
-        if (Test-Path -Path 'requirements.txt') {
-            Write-Output "File 'requirements.txt' found, running 'python -m pipenv' to create a virtual environment ..."
-            Invoke-CommandLine "python -m pipenv install --requirements requirements.txt"
+        if (Test-Path -Path 'pyproject.toml') {
+            $bootstrapPy = Join-Path $PSScriptRoot "bootstrap.py"
+            Invoke-CommandLine "python $bootstrapPy"
         }
-        else {
+        elseif (Test-Path -Path 'Pipfile') {
             Write-Output "File 'Pipfile' found, running 'python -m pipenv' to create a virtual environment ..."
+            Invoke-CommandLine "python -m pip install pipenv pip-system-certs"
             Invoke-CommandLine "python -m pipenv install --dev"
         }
     }
@@ -176,6 +134,7 @@ Function Install-PythonEnvironment {
         Write-Output "No Python config file found, skipping Python setup."
     }
 }
+
 Function Install-Python {
     # python executable name
     $python = "python" + $config.python_version.Replace(".", "")
@@ -197,15 +156,50 @@ Function Install-Python {
     }
 }
 
-
 # Main function needed for testing (will be mocked)
 Function Main {
     Install-Scoop
-    #Install-Python
-    #Install-PythonEnvironment
+    Install-Python
+    Install-PythonEnvironment
 }
 
 ## start of script
+
+# Always set the $InformationPreference variable to "Continue" globally,
+# this way it gets printed on execution and continues execution afterwards.
+$InformationPreference = "Continue"
+
+# Stop on first error
+$ErrorActionPreference = "Stop"
+
+# Load configuration from bootstrap.json or use default values
+$bootstrapJsonPath = "bootstrap.json"
+if (Test-Path $bootstrapJsonPath) {
+    $JsonString = Get-Content $bootstrapJsonPath | Out-String
+    $config = Convert-CustomObjectToHashtable -CustomObject (ConvertFrom-Json $JsonString)
+    if ($config.scoop_config) {
+        $scoop_config = Convert-CustomObjectToHashtable -CustomObject $config.scoop_config
+    }
+    else {
+        $scoop_config = @{}
+    }    
+}
+else {
+    $config = @{
+        python_version                = "3.11"
+        python_package_manager        = "poetry>=1.7.1"
+        scoop_installer               = "https://raw.githubusercontent.com/ScoopInstaller/Install/master/install.ps1"
+        scoop_default_bucket_base_url = "https://raw.githubusercontent.com/ScoopInstaller/Main/master/bucket"
+        scoop_python_bucket_base_url  = "https://raw.githubusercontent.com/ScoopInstaller/Versions/master/bucket"
+        scoop_ignore_scoopfile        = $false
+    }
+    $scoop_config = @{
+        autostash_on_conflict = "true"
+        use_lessmsi           = "true"
+        scoop_repo            = "https://github.com/xxthunder/Scoop"
+        scoop_branch          = "develop"
+    }
+}
 
 Main
 
