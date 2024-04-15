@@ -6,8 +6,8 @@
 * [x] Usage of bootstrap: there shall be "one" liner of powershell to get the bootstrap script and start it.
 * [x] Bootstrap shall be idempotent.
 * [x] Bootstrap shall keep track of the dependencies and do incremental installs.
-* [ ] it should support both on-premise and public dependencies
-  * [ ] this means that bootstrap shall also work without internet connection, only intranet
+* [x] it should support both on-premise and public dependencies
+  * [x] this means that bootstrap shall also work without internet connection, only intranet
 * [x] the bootstrap shall create the virtual environment with the python version configured by the user
 * [x] bootstrap shall run for users without administrative rights
 * [x] bootstrap shall use semantic versioning

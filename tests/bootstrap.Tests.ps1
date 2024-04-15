@@ -193,6 +193,7 @@ Describe "Install-Scoop" {
         }
         Mock -CommandName Invoke-CommandLine -MockWith {}
         Mock -CommandName Initialize-EnvPath -MockWith {}
+        Mock -CommandName Invoke-Expression -MockWith {}
     }
 
     It "shall not install scoop if scoop is already available" {

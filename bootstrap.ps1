@@ -69,14 +69,15 @@ Function Get-BootstrapConfig {
     $bootstrapConfig = @{
         python_version                = "3.11"
         python_package_manager        = "poetry>=1.7.1"
-        scoop_installer               = "https://raw.githubusercontent.com/ScoopInstaller/Install/master/install.ps1"
+        scoop_installer               = "https://raw.githubusercontent.com/xxthunder/ScoopInstall/v1.0.0/install.ps1"
+        scoop_installer_with_repo_arg = $false
         scoop_default_bucket_base_url = "https://raw.githubusercontent.com/ScoopInstaller/Main/master/bucket"
         scoop_python_bucket_base_url  = "https://raw.githubusercontent.com/ScoopInstaller/Versions/master/bucket"
         scoop_ignore_scoopfile        = $false
         scoop_config                  = @{
             autostash_on_conflict = "true"
             use_lessmsi           = "true"
-            scoop_repo            = "https://github.com/xxthunder/Scoop"
+            scoop_repo            = "https://github.com/xxthunder/Scoop.git"
             scoop_branch          = "develop"
         }
     }
@@ -116,14 +117,17 @@ Function Get-BootstrapConfig {
 Function Install-Scoop {
     if (-Not (Get-Command 'scoop' -ErrorAction SilentlyContinue)) {
         $tempDir = [System.IO.Path]::GetTempPath()
-        $tempFile = "$tempDir\install.ps1"
+        $tempFile = Join-Path $tempDir "install.ps1"
         Invoke-RestMethod -Uri $config.scoop_installer -OutFile $tempFile
+        $installCmd = @("$tempFile")
+        if ($config.scoop_installer_with_repo_arg) {
+            $installCmd += "-ScoopAppRepoGit"
+            $installCmd += $config.scoop_config.scoop_repo
+        }
         if ((New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-            & $tempFile -RunAsAdmin
+            $installCmd += "-RunAsAdmin"
         }
-        else {
-            & $tempFile
-        }
+        Invoke-CommandLine "& $($installCmd)"
         Remove-Item $tempFile
         Initialize-EnvPath
     }
