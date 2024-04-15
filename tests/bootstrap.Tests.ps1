@@ -5,6 +5,13 @@ BeforeAll {
     Set-Alias Main out-null
     . ".\$sut"
     Remove-Item Alias:Main
+
+    class ComparableHashTable : Hashtable {
+        ComparableHashTable($obj) : base($obj) {}
+        [string] ToString() {
+            return ($this | ConvertTo-Json)
+        }
+    }
 }
 
 Describe "Convert-CustomObjectToHashtable" {
@@ -115,6 +122,67 @@ Describe "Invoke-CommandLine" {
         Should -Invoke -CommandName Write-Output -Exactly 1
         Should -Invoke -CommandName Write-Output -Exactly 1 -ParameterFilter { $InputObject -eq "Command line call `"git fanatic`" failed with exit code 1, continuing ..." }
         Should -Invoke -CommandName Write-Error -Exactly 0
+    }
+}
+
+Describe "Get-BootstrapConfig" {
+    It "should return the default configuration" {
+        # Arrange
+        Mock -CommandName Test-Path -MockWith { $false }
+
+        # Act
+        $result = Get-BootstrapConfig
+
+        # Assert
+        $result.python_version | Should -Be "3.11"
+        $result.python_package_manager | Should -Be "poetry>=1.7.1"
+        $result.scoop_ignore_scoopfile | Should -Be $false
+        $result.scoop_config.autostash_on_conflict | Should -Be "true"
+        $result.scoop_config.use_lessmsi | Should -Be "true"
+    }
+
+    It "should support custom configuration" {
+        # Arrange
+        Mock -CommandName Test-Path -MockWith { $true }
+        Mock -CommandName Get-Content -MockWith {
+            '{
+                "python_version": "3.9",
+                "scoop_ignore_scoopfile": true,
+                "scoop_config": {
+                    "autostash_on_conflict": "false",
+                    "some_value_without_default": "true"
+                }
+            }'
+        }
+
+        # Act
+        $result = Get-BootstrapConfig
+
+        # Assert
+        $result.python_version | Should -Be "3.9"
+        $result.python_package_manager | Should -Be "poetry>=1.7.1"
+        $result.scoop_ignore_scoopfile | Should -Be $true
+        $result.scoop_config.autostash_on_conflict | Should -Be "false"
+        $result.scoop_config.use_lessmsi | Should -Be "true"
+        $result.scoop_config.some_value_without_default | Should -Be "true"
+    }
+
+    It "should support empty custom configuration" {
+        # Arrange
+        Mock -CommandName Test-Path -MockWith { $true }
+        Mock -CommandName Get-Content -MockWith {
+            '{}'
+        }
+
+        # Act
+        $result = Get-BootstrapConfig
+
+        # Assert
+        $result.python_version | Should -Be "3.11"
+        $result.python_package_manager | Should -Be "poetry>=1.7.1"
+        $result.scoop_ignore_scoopfile | Should -Be $false
+        $result.scoop_config.autostash_on_conflict | Should -Be "true"
+        $result.scoop_config.use_lessmsi | Should -Be "true"
     }
 }
 
