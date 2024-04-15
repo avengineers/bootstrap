@@ -64,6 +64,55 @@ Function Invoke-CommandLine {
     }
 }
 
+# Load configuration from bootstrap.json or use default values
+Function Get-BootstrapConfig {
+    $bootstrapConfig = @{
+        python_version                = "3.11"
+        python_package_manager        = "poetry>=1.7.1"
+        scoop_installer               = "https://raw.githubusercontent.com/ScoopInstaller/Install/master/install.ps1"
+        scoop_default_bucket_base_url = "https://raw.githubusercontent.com/ScoopInstaller/Main/master/bucket"
+        scoop_python_bucket_base_url  = "https://raw.githubusercontent.com/ScoopInstaller/Versions/master/bucket"
+        scoop_ignore_scoopfile        = $false
+        scoop_config                  = @{
+            autostash_on_conflict = "true"
+            use_lessmsi           = "true"
+            scoop_repo            = "https://github.com/xxthunder/Scoop"
+            scoop_branch          = "develop"
+        }
+    }
+
+    $bootstrapJsonPath = "bootstrap.json"
+    if (Test-Path $bootstrapJsonPath) {
+        $JsonString = Get-Content $bootstrapJsonPath | Out-String
+        $custom_config = Convert-CustomObjectToHashtable -CustomObject (ConvertFrom-Json $JsonString)
+        if ($custom_config.scoop_config) {
+            $custom_config.scoop_config = Convert-CustomObjectToHashtable -CustomObject $custom_config.scoop_config
+        }
+        else {
+            $custom_config.scoop_config = @{}
+        } 
+    }
+
+    # Merge the default and custom configuration
+    if ($custom_config) {
+        $custom_config.GetEnumerator() | ForEach-Object {
+            # Handle nested configuration
+            # Overwrite every key in the default configuration with the custom configuration if it exists
+            if ($bootstrapConfig[$_.Key] -is [Hashtable] -and $_.Value -is [Hashtable]) {
+                $hashtableValue = $_.Key
+                $_.Value.GetEnumerator() | ForEach-Object {
+                    $bootstrapConfig[$hashtableValue][$_.Key] = $_.Value
+                }
+            }
+            else {
+                $bootstrapConfig[$_.Key] = $_.Value
+            }
+        }
+    }
+
+    return $bootstrapConfig
+}
+
 Function Install-Scoop {
     if (-Not (Get-Command 'scoop' -ErrorAction SilentlyContinue)) {
         $tempDir = [System.IO.Path]::GetTempPath()
@@ -80,7 +129,7 @@ Function Install-Scoop {
     }
 
     Write-Output "Applying scoop configuration"
-    foreach ($item in $scoop_config.GetEnumerator()) {
+    foreach ($item in $config.scoop_config.GetEnumerator()) {
         Invoke-CommandLine ("scoop config " + $item.Key + " " + $item.Value) -Silent $true
     }
 
@@ -172,34 +221,8 @@ $InformationPreference = "Continue"
 # Stop on first error
 $ErrorActionPreference = "Stop"
 
-# Load configuration from bootstrap.json or use default values
-$bootstrapJsonPath = "bootstrap.json"
-if (Test-Path $bootstrapJsonPath) {
-    $JsonString = Get-Content $bootstrapJsonPath | Out-String
-    $config = Convert-CustomObjectToHashtable -CustomObject (ConvertFrom-Json $JsonString)
-    if ($config.scoop_config) {
-        $scoop_config = Convert-CustomObjectToHashtable -CustomObject $config.scoop_config
-    }
-    else {
-        $scoop_config = @{}
-    }    
-}
-else {
-    $config = @{
-        python_version                = "3.11"
-        python_package_manager        = "poetry>=1.7.1"
-        scoop_installer               = "https://raw.githubusercontent.com/ScoopInstaller/Install/master/install.ps1"
-        scoop_default_bucket_base_url = "https://raw.githubusercontent.com/ScoopInstaller/Main/master/bucket"
-        scoop_python_bucket_base_url  = "https://raw.githubusercontent.com/ScoopInstaller/Versions/master/bucket"
-        scoop_ignore_scoopfile        = $false
-    }
-    $scoop_config = @{
-        autostash_on_conflict = "true"
-        use_lessmsi           = "true"
-        scoop_repo            = "https://github.com/xxthunder/Scoop"
-        scoop_branch          = "develop"
-    }
-}
+# Load config
+$config = Get-BootstrapConfig
 
 Main
 
