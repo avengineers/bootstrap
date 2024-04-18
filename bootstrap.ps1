@@ -138,11 +138,14 @@ Function Install-Scoop {
     }
 
     # Install any installer dependencies
+    # CAUTION: the order is important and shall not be changed!
+    # - 7zip needs lessmsi for installation
+    # - innounp needs 7zip
     $manifests = @(
-        "7zip.json",
-        "dark.json",
         "lessmsi.json",
-        "innounp.json"
+        "7zip.json",
+        "innounp.json",
+        "dark.json"
     )
     $manifests | ForEach-Object {
         Invoke-CommandLine "scoop install $($config.scoop_default_bucket_base_url)/$_" -Silent $true
