@@ -421,8 +421,8 @@ def print_environment_info() -> None:
 def main() -> int:
     try:
         # print_environment_info()
-        build = CreateVirtualEnvironment()
-        Executor(build.venv_dir).execute(build)
+        creator = CreateVirtualEnvironment()
+        Executor(creator.venv_dir).execute(creator)
     except UserNotificationException as e:
         logger.error(e)
         return 1

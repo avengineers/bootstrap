@@ -23,7 +23,7 @@ function Convert-CustomObjectToHashtable {
 }
 
 # Update/Reload current environment variable PATH with settings from registry
-Function Initialize-EnvPath {
+function Initialize-EnvPath {
     # workaround for system-wide installations (e.g. in GitHub Actions)
     if ($Env:USER_PATH_FIRST) {
         $Env:Path = [System.Environment]::GetEnvironmentVariable("Path", "User") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "Machine")
@@ -33,7 +33,7 @@ Function Initialize-EnvPath {
     }
 }
 
-Function Invoke-CommandLine {
+function Invoke-CommandLine {
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingInvokeExpression', '', Justification = 'Usually this statement must be avoided (https://learn.microsoft.com/en-us/powershell/scripting/learn/deep-dives/avoid-using-invoke-expression?view=powershell-7.3), here it is OK as it does not execute unknown code.')]
     param (
         [Parameter(Mandatory = $true, Position = 0)]
@@ -65,7 +65,7 @@ Function Invoke-CommandLine {
 }
 
 # Load configuration from bootstrap.json or use default values
-Function Get-BootstrapConfig {
+function Get-BootstrapConfig {
     $bootstrapConfig = @{
         python_version                = "3.11"
         python_package_manager        = "poetry>=1.7.1"
@@ -114,7 +114,7 @@ Function Get-BootstrapConfig {
     return $bootstrapConfig
 }
 
-Function Install-Scoop {
+function Install-Scoop {
     if (-Not (Get-Command 'scoop' -ErrorAction SilentlyContinue)) {
         $tempDir = [System.IO.Path]::GetTempPath()
         $tempFile = Join-Path $tempDir "install.ps1"
@@ -165,7 +165,7 @@ Function Install-Scoop {
 }
 
 # Prepare virtual Python environment
-Function Install-PythonEnvironment {
+function Install-PythonEnvironment {
     if ((Test-Path -Path 'pyproject.toml') -or (Test-Path -Path 'Pipfile')) {
         if ($clean) {
             # Start with a fresh virtual environment
@@ -191,7 +191,7 @@ Function Install-PythonEnvironment {
     }
 }
 
-Function Install-Python {
+function Install-Python {
     # python executable name
     $python = "python" + $config.python_version.Replace(".", "")
 
@@ -213,7 +213,7 @@ Function Install-Python {
 }
 
 # Main function needed for testing (will be mocked)
-Function Main {
+function Main {
     Install-Scoop
     Install-Python
     Install-PythonEnvironment
