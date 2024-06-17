@@ -1,5 +1,7 @@
 {
     "recommendations": [
-        "ms-vscode.powershell"
+        "ms-vscode.powershell",
+        "tamasfe.even-better-toml",
+        "charliermarsh.ruff"
     ]
 }

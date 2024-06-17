@@ -22,6 +22,35 @@ function Convert-CustomObjectToHashtable {
     return $hashtable
 }
 
+function Remove-Path {
+    [CmdletBinding(SupportsShouldProcess)]
+    param (
+        [Parameter(Mandatory = $true, Position = 0)]
+        [string]$path
+    )
+    if (Test-Path -Path $path -PathType Container) {
+        Write-Output "Deleting directory '$path' ..."
+        Remove-Item $path -Force -Recurse
+    }
+    elseif (Test-Path -Path $path -PathType Leaf) {
+        Write-Output "Deleting file '$path' ..."
+        Remove-Item $path -Force
+    }
+}
+
+function New-Directory {
+    [CmdletBinding(SupportsShouldProcess)]
+    param (
+        [Parameter(Mandatory = $true, Position = 0)]
+        [string]$dir
+    )
+    if (-Not (Test-Path -Path $dir)) {
+        Write-Output "Creating directory '$dir' ..."
+        New-Item -ItemType Directory $dir
+    }
+}
+
+
 # Update/Reload current environment variable PATH with settings from registry
 function Initialize-EnvPath {
     # workaround for system-wide installations (e.g. in GitHub Actions)
@@ -169,22 +198,11 @@ function Install-PythonEnvironment {
     if ((Test-Path -Path 'pyproject.toml') -or (Test-Path -Path 'Pipfile')) {
         if ($clean) {
             # Start with a fresh virtual environment
-            if (Test-Path -Path '.venv') {
-                Remove-Item -Path '.venv' -Recurse -Force
-            }
+            Remove-Path '.venv'
         }
-        if (-Not (Test-Path -Path '.venv' -PathType Container)) {
-            New-Item -ItemType Directory '.venv'
-        }
-        if (Test-Path -Path 'pyproject.toml') {
-            $bootstrapPy = Join-Path $PSScriptRoot "bootstrap.py"
-            Invoke-CommandLine "python $bootstrapPy"
-        }
-        elseif (Test-Path -Path 'Pipfile') {
-            Write-Output "File 'Pipfile' found, running 'python -m pipenv' to create a virtual environment ..."
-            Invoke-CommandLine "python -m pip install pipenv pip-system-certs"
-            Invoke-CommandLine "python -m pipenv install --dev"
-        }
+        New-Directory '.venv'
+        $bootstrapPy = Join-Path $PSScriptRoot "bootstrap.py"
+        Invoke-CommandLine "python $bootstrapPy"
     }
     else {
         Write-Output "No Python config file found, skipping Python setup."
