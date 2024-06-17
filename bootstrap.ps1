@@ -202,7 +202,7 @@ function Install-PythonEnvironment {
         }
         New-Directory '.venv'
         $bootstrapPy = Join-Path $PSScriptRoot "bootstrap.py"
-        Invoke-CommandLine "python $bootstrapPy"
+        Invoke-CommandLine "$python $bootstrapPy"
     }
     else {
         Write-Output "No Python config file found, skipping Python setup."
@@ -210,9 +210,6 @@ function Install-PythonEnvironment {
 }
 
 function Install-Python {
-    # python executable name
-    $python = "python" + $config.python_version.Replace(".", "")
-
     # Check if python is installed
     $pythonPath = (Get-Command $python -ErrorAction SilentlyContinue).Source
     if ($null -eq $pythonPath) {
@@ -248,6 +245,9 @@ $ErrorActionPreference = "Stop"
 
 # Load config
 $config = Get-BootstrapConfig
+
+# python executable name
+$python = "python" + $config.python_version.Replace(".", "")
 
 Main
 

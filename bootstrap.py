@@ -115,10 +115,10 @@ class Runnable(ABC):
 
 
 class RunInfoStatus(Enum):
-    MATCH = (False, "Nothing changed. Previous execution info matches.")
-    NO_INFO = (True, "No previous execution info found.")
-    FILE_NOT_FOUND = (True, "File not found.")
-    FILE_CHANGED = (True, "File has changed.")
+    MATCH = (False, "Nothing has changed, previous execution information matches.")
+    NO_INFO = (True, "No previous execution information found.")
+    FILE_NOT_FOUND = (True, "Dependencies have been removed.")
+    FILE_CHANGED = (True, "Dependencies have been changed.")
 
     def __init__(self, should_run: bool, message: str) -> None:
         self.should_run = should_run
@@ -225,13 +225,13 @@ class VirtualEnvironment(ABC):
     def __init__(self, venv_dir: Path) -> None:
         self.venv_dir = venv_dir
 
-    def create(self, clear: bool = False) -> None:
+    def create(self) -> None:
         """
         Create a new virtual environment. This should configure the virtual environment such that
         subsequent calls to `pip` and `run` operate within this environment.
         """
         try:
-            venv.create(self.venv_dir, with_pip=True, clear=clear)
+            venv.create(self.venv_dir, with_pip=True, system_site_packages=True)
         except PermissionError as e:
             if "python.exe" in str(e):
                 raise UserNotificationException(
@@ -239,7 +239,7 @@ class VirtualEnvironment(ABC):
                 ) from e
             raise UserNotificationException(f"Failed to create virtual environment in {self.venv_dir}.\n" f"Please make sure you have the necessary permissions.\n" f"Error: {e}") from e
 
-    def pip_configure(self, index_url: str, verify_ssl: bool) -> None:
+    def pip_configure(self, index_url: str, verify_ssl: bool = True) -> None:
         """
         Configure pip to use the given index URL and SSL verification setting. This method should
         behave as if the user had activated the virtual environment and run `pip config set
@@ -257,8 +257,6 @@ class VirtualEnvironment(ABC):
         with open(pip_ini_path, "w") as pip_ini_file:
             match_host = re.match(r"https?://([^/]+)", index_url)
             pip_ini_file.write(f"[global]\nindex-url = {index_url}\n")
-            if match_host:
-                pip_ini_file.write(f"trusted-host = {match_host.group(1)}\n")
             if not verify_ssl:
                 pip_ini_file.write("cert = false\n")
 
@@ -297,7 +295,7 @@ class WindowsVirtualEnvironment(VirtualEnvironment):
         self.activate_script = self.venv_dir.joinpath("Scripts/activate")
 
     def pip_path(self) -> Path:
-        return self.venv_dir.joinpath("Scripts/pip")
+        return self.venv_dir.joinpath("Scripts/pip.exe")
 
     def pip_config_path(self) -> Path:
         return self.venv_dir.joinpath("pip.ini")
@@ -357,12 +355,12 @@ class CreateVirtualEnvironment(Runnable):
             raise UserNotificationException(f"Could not extract the package manager name from {package_manager}")
 
     def run(self) -> int:
-        logger.info("Running project build script")
-        self.virtual_env.create(clear=self.venv_dir.exists())
+        if not self.virtual_env.pip_path().exists():
+            self.virtual_env.create()
         pypi_source = PyPiSourceParser.from_pyproject(self.root_dir)
         if pypi_source:
             self.virtual_env.pip_configure(index_url=pypi_source.url, verify_ssl=True)
-        self.virtual_env.pip(["install", package_manager])
+        self.virtual_env.pip(["install", package_manager, "pip-system-certs", "--use-feature=truststore"])
         self.virtual_env.run([self.package_manager_name, "install"])
         return 0
 
