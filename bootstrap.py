@@ -43,19 +43,22 @@ class TomlSection:
 
 
 class PyPiSourceParser:
-    tool_poetry_source_section = "tool.poetry.source"
-
     @staticmethod
-    def from_pyproject_toml(pyproject_toml: Path) -> Optional[PyPiSource]:
-        if not pyproject_toml.exists():
+    def from_pyproject(project_dir: Path) -> Optional[PyPiSource]:
+        pyproject_toml = project_dir / "pyproject.toml"
+        pipfile = project_dir / "Pipfile"
+        if pyproject_toml.exists():
+            return PyPiSourceParser.from_toml_content(pyproject_toml.read_text(), "tool.poetry.source")
+        elif pipfile.exists():
+            return PyPiSourceParser.from_toml_content(pipfile.read_text(), "source")
+        else:
             return None
-        return PyPiSourceParser.from_pyproject_toml_content(pyproject_toml.read_text())
 
     @staticmethod
-    def from_pyproject_toml_content(content: str) -> Optional[PyPiSource]:
+    def from_toml_content(content: str, source_section_name: str) -> Optional[PyPiSource]:
         sections = PyPiSourceParser.get_toml_sections(content)
         for section in sections:
-            if section.name == PyPiSourceParser.tool_poetry_source_section:
+            if section.name == source_section_name:
                 try:
                     parser = configparser.ConfigParser()
                     parser.read_string(str(section))
@@ -64,21 +67,19 @@ class PyPiSourceParser:
                     return PyPiSource(name, url)
                 except KeyError:
                     raise UserNotificationException(
-                        f"Could not parse PyPi source from pyproject.toml section {section.name}. "
+                        f"Could not parse PyPi source from section {section.name}. "
                         f"Please make sure the section has the following format:\n"
-                        f"[{PyPiSourceParser.tool_poetry_source_section}]\n"
+                        f"[{source_section_name}]\n"
                         f'name = "name"\n'
                         f'url = "https://url"\n'
                         f"verify_ssl = true"
-                    )
+                    ) from None
         return None
 
     @staticmethod
     def get_toml_sections(toml_content: str) -> List[TomlSection]:
         # Use a regular expression to find all sections with [ or [[ at the beginning of the line
-        raw_sections = re.findall(
-            r"^\[+.*\]+\n(?:[^[]*\n)*", toml_content, re.MULTILINE
-        )
+        raw_sections = re.findall(r"^\[+.*\]+\n(?:[^[]*\n)*", toml_content, re.MULTILINE)
 
         # Process each section
         sections = []
@@ -145,12 +146,8 @@ class Executor:
 
     def store_run_info(self, runnable: Runnable) -> None:
         file_info = {
-            "inputs": {
-                str(path): self.get_file_hash(path) for path in runnable.get_inputs()
-            },
-            "outputs": {
-                str(path): self.get_file_hash(path) for path in runnable.get_outputs()
-            },
+            "inputs": {str(path): self.get_file_hash(path) for path in runnable.get_inputs()},
+            "outputs": {str(path): self.get_file_hash(path) for path in runnable.get_outputs()},
         }
 
         run_info_path = self.get_runnable_run_info_file(runnable)
@@ -182,15 +179,11 @@ class Executor:
     def execute(self, runnable: Runnable) -> int:
         run_info_status = self.previous_run_info_matches(runnable)
         if run_info_status.should_run:
-            logger.info(
-                f"Runnable '{runnable.get_name()}' must run. {run_info_status.message}"
-            )
+            logger.info(f"Runnable '{runnable.get_name()}' must run. {run_info_status.message}")
             exit_code = runnable.run()
             self.store_run_info(runnable)
             return exit_code
-        logger.info(
-            f"Runnable '{runnable.get_name()}' execution skipped. {run_info_status.message}"
-        )
+        logger.info(f"Runnable '{runnable.get_name()}' execution skipped. {run_info_status.message}")
 
         return 0
 
@@ -225,11 +218,7 @@ class SubprocessExecutor:
             )  # nosec
             result.check_returncode()
         except subprocess.CalledProcessError as e:
-            raise UserNotificationException(
-                f"Command '{self.command}' failed with:\n"
-                f"{result.stdout if result else ''}\n"
-                f"{result.stderr if result else e}"
-            ) from e
+            raise UserNotificationException(f"Command '{self.command}' failed with:\n" f"{result.stdout if result else ''}\n" f"{result.stderr if result else e}") from e
 
 
 class VirtualEnvironment(ABC):
@@ -246,15 +235,9 @@ class VirtualEnvironment(ABC):
         except PermissionError as e:
             if "python.exe" in str(e):
                 raise UserNotificationException(
-                    f"Failed to create virtual environment in {self.venv_dir}.\n"
-                    f"Virtual environment python.exe is still running. Please kill all instances and run again.\n"
-                    f"Error: {e}"
+                    f"Failed to create virtual environment in {self.venv_dir}.\n" f"Virtual environment python.exe is still running. Please kill all instances and run again.\n" f"Error: {e}"
                 ) from e
-            raise UserNotificationException(
-                f"Failed to create virtual environment in {self.venv_dir}.\n"
-                f"Please make sure you have the necessary permissions.\n"
-                f"Error: {e}"
-            ) from e
+            raise UserNotificationException(f"Failed to create virtual environment in {self.venv_dir}.\n" f"Please make sure you have the necessary permissions.\n" f"Error: {e}") from e
 
     def pip_configure(self, index_url: str, verify_ssl: bool) -> None:
         """
@@ -349,7 +332,8 @@ class UnixVirtualEnvironment(VirtualEnvironment):
         SubprocessExecutor(["chmod", "+x", temp_script_path]).execute()
         # Run the temporary script
         SubprocessExecutor(
-            command=[f"{Path(temp_script_path).as_posix()}"], capture_output=capture_output
+            command=[f"{Path(temp_script_path).as_posix()}"],
+            capture_output=capture_output,
         ).execute()
         # Delete the temporary script
         os.remove(temp_script_path)
@@ -370,16 +354,12 @@ class CreateVirtualEnvironment(Runnable):
         if match:
             return match.group(1)
         else:
-            raise UserNotificationException(
-                f"Could not extract the package manager name from {package_manager}"
-            )
+            raise UserNotificationException(f"Could not extract the package manager name from {package_manager}")
 
     def run(self) -> int:
         logger.info("Running project build script")
         self.virtual_env.create(clear=self.venv_dir.exists())
-        pypi_source = PyPiSourceParser.from_pyproject_toml(
-            self.root_dir / "pyproject.toml"
-        )
+        pypi_source = PyPiSourceParser.from_pyproject(self.root_dir)
         if pypi_source:
             self.virtual_env.pip_configure(index_url=pypi_source.url, verify_ssl=True)
         self.virtual_env.pip(["install", package_manager])
@@ -393,9 +373,7 @@ class CreateVirtualEnvironment(Runnable):
         elif sys.platform.startswith("linux") or sys.platform.startswith("darwin"):
             return UnixVirtualEnvironment(venv_dir)
         else:
-            raise UserNotificationException(
-                f"Unsupported operating system: {sys.platform}"
-            )
+            raise UserNotificationException(f"Unsupported operating system: {sys.platform}")
 
     def get_name(self) -> str:
         return "create-virtual-environment"

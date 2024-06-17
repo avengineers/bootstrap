@@ -284,9 +284,8 @@ Describe "Install-PythonEnvironment" {
 
         Install-PythonEnvironment
 
-        Should -Invoke -CommandName Invoke-CommandLine -Exactly 2
-        Should -Invoke -CommandName Invoke-CommandLine -Exactly 1 -ParameterFilter { $CommandLine -eq "python -m pip install pipenv pip-system-certs" }
-        Should -Invoke -CommandName Invoke-CommandLine -Exactly 1 -ParameterFilter { $CommandLine -eq "python -m pipenv install --dev" }
+        Should -Invoke -CommandName Invoke-CommandLine -Exactly 1
+        Should -Invoke -CommandName Invoke-CommandLine -Exactly 1 -ParameterFilter { $CommandLine -like "python *\bootstrap.py" }
         Should -Invoke -CommandName New-Item -Exactly 1
     }
 

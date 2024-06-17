@@ -1,6 +1,6 @@
  [tool.poetry]
 name = "bootstrap"
-version = "0.1.0"
+version = "1.7.0"
 description = "Initial tool installation for a python project"
 authors = ["Avengineers <karsten.guenther@kamg.de>"]
 license = "MIT"
@@ -17,4 +17,43 @@ pytest-mock = "^3.3"
 
 [tool.pytest.ini_options]
 addopts = "-v -Wdefault"
-testpaths = "tests/"
+pythonpaths = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py38"
+line-length = 220
+lint.ignore = [
+    "D203", # 1 blank line required before class docstring
+    "D212", # Multi-line docstring summary should start at the first line
+    "D100", # Missing docstring in public module
+    "D101", # Missing docstring in public class
+    "D102", # Missing docstring in public method
+    "D103", # Missing docstring in public function
+    "D104", # Missing docstring in public package
+    "D107", # Missing docstring in `__init__`
+    "D401", # First line of docstring should be in imperative mood
+    "S603", # subprocess calls with shell=True
+]
+lint.select = [
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "S",   # flake8-bandit
+    "F",   # pyflake
+    "E",   # pycodestyle
+    "W",   # pycodestyle
+    "UP",  # pyupgrade
+    "I",   # isort
+    "RUF", # ruff specific
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*" = [
+    "D100",
+    "D101",
+    "D102",
+    "D103",
+    "D104",
+    "S101",
+]
+
