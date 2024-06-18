@@ -23,8 +23,10 @@ if bootstrap_json_path.exists():
     with bootstrap_json_path.open("r") as f:
         config = json.load(f)
     package_manager = config.get("python_package_manager", "poetry>=1.7.1")
+    package_manager_args = config.get("python_package_manager_args", [])
 else:
     package_manager = "poetry>=1.7.1"
+    package_manager_args = []
 
 
 @dataclass
@@ -139,10 +141,15 @@ class Executor:
 
     @staticmethod
     def get_file_hash(path: Path) -> str:
-        with open(path, "rb") as file:
-            bytes = file.read()
-            readable_hash = hashlib.sha256(bytes).hexdigest()
-            return readable_hash
+        """Get the hash of a file.
+        Returns an empty string if the file does not exist."""
+        if path.is_file():
+            with open(path, "rb") as file:
+                bytes = file.read()
+                readable_hash = hashlib.sha256(bytes).hexdigest()
+                return readable_hash
+        else:
+            return ""
 
     def store_run_info(self, runnable: Runnable) -> None:
         file_info = {
@@ -338,11 +345,10 @@ class UnixVirtualEnvironment(VirtualEnvironment):
 
 
 class CreateVirtualEnvironment(Runnable):
-    def __init__(
-        self,
-    ) -> None:
-        self.root_dir = Path.cwd()
+    def __init__(self, root_dir) -> None:
+        self.root_dir = root_dir
         self.venv_dir = self.root_dir / ".venv"
+        self.bootstrap_dir = self.root_dir / ".bootstrap"
         self.virtual_env = self.instantiate_os_specific_venv(self.venv_dir)
 
     @property
@@ -361,7 +367,7 @@ class CreateVirtualEnvironment(Runnable):
         if pypi_source:
             self.virtual_env.pip_configure(index_url=pypi_source.url, verify_ssl=True)
         self.virtual_env.pip(["install", package_manager, "pip-system-certs", "--use-feature=truststore"])
-        self.virtual_env.run([self.package_manager_name, "install"])
+        self.virtual_env.run([self.package_manager_name, "install", *package_manager_args])
         return 0
 
     @staticmethod
@@ -377,9 +383,20 @@ class CreateVirtualEnvironment(Runnable):
         return "create-virtual-environment"
 
     def get_inputs(self) -> List[Path]:
-        bootstrap_files = list(self.root_dir.glob("bootstrap.*"))
-        venv_relevant_files = ["poetry.lock", "poetry.toml", "pyproject.toml"]
-        return [self.root_dir / file for file in venv_relevant_files] + bootstrap_files
+        venv_relevant_files = [
+            "poetry.lock",
+            "poetry.toml",
+            "pyproject.toml",
+            ".env",
+            "Pipfile",
+            "Pipfile.lock",
+            "bootstrap.json",
+            ".bootstrap/bootstrap.ps1",
+            ".bootstrap/bootstrap.py",
+            "bootstrap.ps1",
+            "bootstrap.py",
+        ]
+        return [self.root_dir / file for file in venv_relevant_files]
 
     def get_outputs(self) -> List[Path]:
         return []
@@ -397,7 +414,7 @@ def print_environment_info() -> None:
 def main() -> int:
     try:
         # print_environment_info()
-        creator = CreateVirtualEnvironment()
+        creator = CreateVirtualEnvironment(Path.cwd())
         Executor(creator.venv_dir).execute(creator)
     except UserNotificationException as e:
         logger.error(e)

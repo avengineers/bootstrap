@@ -135,7 +135,6 @@ Describe "Get-BootstrapConfig" {
 
         # Assert
         $result.python_version | Should -Be "3.11"
-        $result.python_package_manager | Should -Be "poetry>=1.7.1"
         $result.scoop_ignore_scoopfile | Should -Be $false
         $result.scoop_config.autostash_on_conflict | Should -Be "true"
         $result.scoop_config.use_lessmsi | Should -Be "true"
@@ -160,7 +159,6 @@ Describe "Get-BootstrapConfig" {
 
         # Assert
         $result.python_version | Should -Be "3.9"
-        $result.python_package_manager | Should -Be "poetry>=1.7.1"
         $result.scoop_ignore_scoopfile | Should -Be $true
         $result.scoop_config.autostash_on_conflict | Should -Be "false"
         $result.scoop_config.use_lessmsi | Should -Be "true"
@@ -179,7 +177,6 @@ Describe "Get-BootstrapConfig" {
 
         # Assert
         $result.python_version | Should -Be "3.11"
-        $result.python_package_manager | Should -Be "poetry>=1.7.1"
         $result.scoop_ignore_scoopfile | Should -Be $false
         $result.scoop_config.autostash_on_conflict | Should -Be "true"
         $result.scoop_config.use_lessmsi | Should -Be "true"
@@ -285,7 +282,7 @@ Describe "Install-PythonEnvironment" {
         Install-PythonEnvironment
 
         Should -Invoke -CommandName Invoke-CommandLine -Exactly 1
-        Should -Invoke -CommandName Invoke-CommandLine -Exactly 1 -ParameterFilter { $CommandLine -like "python *\bootstrap.py" }
+        Should -Invoke -CommandName Invoke-CommandLine -Exactly 1 -ParameterFilter { $CommandLine -like "python311 *\bootstrap.py" }
         Should -Invoke -CommandName New-Item -Exactly 1
     }
 
@@ -296,7 +293,7 @@ Describe "Install-PythonEnvironment" {
         Install-PythonEnvironment
 
         Should -Invoke -CommandName Invoke-CommandLine -Exactly 1
-        Should -Invoke -CommandName Invoke-CommandLine -Exactly 1 -ParameterFilter { $CommandLine -like "python *\bootstrap.py" }
+        Should -Invoke -CommandName Invoke-CommandLine -Exactly 1 -ParameterFilter { $CommandLine -like "python311 *\bootstrap.py" }
         Should -Invoke -CommandName New-Item -Exactly 1
     }
 }
