@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import List, Optional
+from urllib.parse import urlparse
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("bootstrap")
@@ -366,7 +367,15 @@ class CreateVirtualEnvironment(Runnable):
         pypi_source = PyPiSourceParser.from_pyproject(self.root_dir)
         if pypi_source:
             self.virtual_env.pip_configure(index_url=pypi_source.url, verify_ssl=True)
-        self.virtual_env.pip(["install", package_manager, "pip-system-certs", "--use-feature=truststore"])
+        pip_args = ["install", package_manager, "pip-system-certs"]
+        if sys.version_info >= (3, 11):
+            # Use the new trust store feature in Python 3.11
+            pip_args.append("--use-feature=truststore")
+        else:
+            # Add trusted host of configured source for older Python versions
+            if pypi_source:
+                pip_args.extend(["--trusted-host", urlparse(pypi_source.url).hostname])
+        self.virtual_env.pip(pip_args)
         self.virtual_env.run([self.package_manager_name, "install", *package_manager_args])
         return 0
 
