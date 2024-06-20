@@ -120,7 +120,6 @@ class Runnable(ABC):
 class RunInfoStatus(Enum):
     MATCH = (False, "Nothing has changed, previous execution information matches.")
     NO_INFO = (True, "No previous execution information found.")
-    FILE_NOT_FOUND = (True, "Dependencies have been removed.")
     FILE_CHANGED = (True, "Dependencies have been changed.")
 
     def __init__(self, should_run: bool, message: str) -> None:
@@ -178,9 +177,7 @@ class Executor:
         for file_type in ["inputs", "outputs"]:
             for path_str, previous_hash in previous_info[file_type].items():
                 path = Path(path_str)
-                if not path.exists():
-                    return RunInfoStatus.FILE_NOT_FOUND
-                elif self.get_file_hash(path) != previous_hash:
+                if self.get_file_hash(path) != previous_hash:
                     return RunInfoStatus.FILE_CHANGED
         return RunInfoStatus.MATCH
 
