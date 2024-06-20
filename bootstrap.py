@@ -239,7 +239,7 @@ class VirtualEnvironment(ABC):
         subsequent calls to `pip` and `run` operate within this environment.
         """
         try:
-            venv.create(self.venv_dir, with_pip=True, system_site_packages=True)
+            venv.create(env_dir=self.venv_dir, with_pip=True)
         except PermissionError as e:
             if "python.exe" in str(e):
                 raise UserNotificationException(
