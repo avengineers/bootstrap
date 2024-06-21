@@ -22,77 +22,6 @@ function Convert-CustomObjectToHashtable {
     return $hashtable
 }
 
-function Remove-Path {
-    [CmdletBinding(SupportsShouldProcess)]
-    param (
-        [Parameter(Mandatory = $true, Position = 0)]
-        [string]$path
-    )
-    if (Test-Path -Path $path -PathType Container) {
-        Write-Output "Deleting directory '$path' ..."
-        Remove-Item $path -Force -Recurse
-    }
-    elseif (Test-Path -Path $path -PathType Leaf) {
-        Write-Output "Deleting file '$path' ..."
-        Remove-Item $path -Force
-    }
-}
-
-function New-Directory {
-    [CmdletBinding(SupportsShouldProcess)]
-    param (
-        [Parameter(Mandatory = $true, Position = 0)]
-        [string]$dir
-    )
-    if (-Not (Test-Path -Path $dir)) {
-        Write-Output "Creating directory '$dir' ..."
-        New-Item -ItemType Directory $dir
-    }
-}
-
-
-# Update/Reload current environment variable PATH with settings from registry
-function Initialize-EnvPath {
-    # workaround for system-wide installations (e.g. in GitHub Actions)
-    if ($Env:USER_PATH_FIRST) {
-        $Env:Path = [System.Environment]::GetEnvironmentVariable("Path", "User") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "Machine")
-    }
-    else {
-        $Env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
-    }
-}
-
-function Invoke-CommandLine {
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingInvokeExpression', '', Justification = 'Usually this statement must be avoided (https://learn.microsoft.com/en-us/powershell/scripting/learn/deep-dives/avoid-using-invoke-expression?view=powershell-7.3), here it is OK as it does not execute unknown code.')]
-    param (
-        [Parameter(Mandatory = $true, Position = 0)]
-        [string]$CommandLine,
-        [Parameter(Mandatory = $false, Position = 1)]
-        [bool]$StopAtError = $true,
-        [Parameter(Mandatory = $false, Position = 2)]
-        [bool]$Silent = $false
-    )
-    if (-Not $Silent) {
-        Write-Output "Executing: $CommandLine"
-    }
-    $global:LASTEXITCODE = 0
-    if ($Silent) {
-        # Omit information stream (6) and stdout (1)
-        Invoke-Expression $CommandLine 6>&1 | Out-Null
-    }
-    else {
-        Invoke-Expression $CommandLine
-    }
-    if ($global:LASTEXITCODE -ne 0) {
-        if ($StopAtError) {
-            Write-Error "Command line call `"$CommandLine`" failed with exit code $global:LASTEXITCODE"
-        }
-        else {
-            Write-Output "Command line call `"$CommandLine`" failed with exit code $global:LASTEXITCODE, continuing ..."
-        }
-    }
-}
-
 # Load configuration from bootstrap.json or use default values
 function Get-BootstrapConfig {
     $bootstrapConfig = @{
@@ -241,6 +170,9 @@ $InformationPreference = "Continue"
 
 # Stop on first error
 $ErrorActionPreference = "Stop"
+
+# Load functions from utils.ps1
+. "$PSScriptRoot\utils.ps1"
 
 # Load config
 $config = Get-BootstrapConfig
