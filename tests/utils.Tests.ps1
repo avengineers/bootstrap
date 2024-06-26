@@ -5,13 +5,6 @@ BeforeAll {
     Set-Alias Main out-null
     . ".\$sut"
     Remove-Item Alias:Main
-
-    class ComparableHashTable : Hashtable {
-        ComparableHashTable($obj) : base($obj) {}
-        [string] ToString() {
-            return ($this | ConvertTo-Json)
-        }
-    }
 }
 
 Describe "Invoke-CommandLine" {
@@ -75,5 +68,23 @@ Describe "Invoke-CommandLine" {
         Should -Invoke -CommandName Write-Output -Exactly 1
         Should -Invoke -CommandName Write-Output -Exactly 1 -ParameterFilter { $InputObject -eq "Command line call `"git fanatic`" failed with exit code 1, continuing ..." }
         Should -Invoke -CommandName Write-Error -Exactly 0
+    }
+}
+
+Describe "Test-RunningInCIorTestEnvironment" {
+    It "shall return true when running in a CI or test environment" {
+        $Env:PYTEST_CURRENT_TEST="1"
+        $Env:GITHUB_ACTIONS=""
+        $Env:JENKINS_URL=""
+
+        Test-RunningInCIorTestEnvironment | Should -Be $true
+    }
+
+    It "shall return false when not running in a CI or test environment" {
+        $Env:PYTEST_CURRENT_TEST=""
+        $Env:GITHUB_ACTIONS=""
+        $Env:JENKINS_URL=""
+
+        Test-RunningInCIorTestEnvironment | Should -Be $false
     }
 }
