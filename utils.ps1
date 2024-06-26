@@ -132,3 +132,7 @@ function CloneOrPullGitRepo {
         Pop-Location
     }
 }
+
+function Test-RunningInCIorTestEnvironment {
+    return [Boolean]($Env:JENKINS_URL -or $Env:PYTEST_CURRENT_TEST -or $Env:GITHUB_ACTIONS)
+}
