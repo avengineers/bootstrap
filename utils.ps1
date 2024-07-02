@@ -136,3 +136,30 @@ function CloneOrPullGitRepo {
 function Test-RunningInCIorTestEnvironment {
     return [Boolean]($Env:JENKINS_URL -or $Env:PYTEST_CURRENT_TEST -or $Env:GITHUB_ACTIONS)
 }
+
+function Get-UserConfirmation {
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$message,
+        # Default value of the confirmation prompt
+        [Parameter(Mandatory = $false)]
+        [bool]$defaultValueForUser = $true,
+        # Value when running in CI or test environment
+        [Parameter(Mandatory = $false)]
+        [bool]$valueForCi = $false
+    )
+    
+    if (Test-RunningInCIorTestEnvironment) {
+        return $valueForCi
+    } else {
+        $defaultText = if ($defaultValueForUser) { "[Y/n]" } else { "[y/N]" }
+        $userResponse = Read-Host "$message $defaultText"
+        if ($userResponse -eq '') {
+            return $defaultValueForUser
+        } elseif ($userResponse -match '^[Yy]') {
+            return $true
+        } else {
+            return $false
+        }
+    }
+}
