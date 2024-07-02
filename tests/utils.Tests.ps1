@@ -88,3 +88,63 @@ Describe "Test-RunningInCIorTestEnvironment" {
         Test-RunningInCIorTestEnvironment | Should -Be $false
     }
 }
+
+Describe 'Get-UserConfirmation' {
+    Context 'When running in CI environment' {
+        BeforeEach {
+            $env:JENKINS_URL = "http://example.com"
+        }
+        AfterEach {
+            Remove-Item Env:JENKINS_URL
+        }
+        It 'Returns the default value' {
+            $result = Get-UserConfirmation -message "Test" -valueForCi $true
+            $result | Should -Be $true
+
+            $result = Get-UserConfirmation -message "Test" -valueForCi $false
+            $result | Should -Be $false
+            
+            $result = Get-UserConfirmation -message "Test"
+            $result | Should -Be $false
+        }
+    }
+
+    Context 'When running interactively' {
+        BeforeEach {
+            Mock -CommandName Read-Host -MockWith {
+                return $script:MockReadHostResponse
+            }
+        }
+        It 'Returns true when user input is yes' {
+            $script:MockReadHostResponse = 'y'
+            $result = Get-UserConfirmation -message "Test" -defaultValueForUser $false
+            $result | Should -Be $true
+            $script:MockReadHostResponse = 'Y'
+            $result = Get-UserConfirmation -message "Test" -defaultValueForUser $false
+            $result | Should -Be $true
+        }
+        It 'Returns false when user input is no' {
+            $script:MockReadHostResponse = 'n'
+            $result = Get-UserConfirmation -message "Test" -defaultValueForUser $true
+            $result | Should -Be $false
+            $script:MockReadHostResponse = 'N'
+            $result = Get-UserConfirmation -message "Test" -defaultValueForUser $true
+            $result | Should -Be $false
+        }
+        It 'Returns default true when user input is empty' {
+            $script:MockReadHostResponse = ''
+            $result = Get-UserConfirmation -message "Test"
+            $result | Should -Be $true
+        }
+        It 'Returns true when user input is empty and default is true' {
+            $script:MockReadHostResponse = ''
+            $result = Get-UserConfirmation -message "Test" -defaultValueForUser $true
+            $result | Should -Be $true
+        }
+        It 'Returns false when user input is empty and default is false' {
+            $script:MockReadHostResponse = ''
+            $result = Get-UserConfirmation -message "Test" -defaultValueForUser $false
+            $result | Should -Be $false
+        }
+    }
+}
