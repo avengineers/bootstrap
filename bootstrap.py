@@ -364,6 +364,8 @@ class CreateVirtualEnvironment(Runnable):
         pypi_source = PyPiSourceParser.from_pyproject(self.root_dir)
         if pypi_source:
             self.virtual_env.pip_configure(index_url=pypi_source.url, verify_ssl=True)
+        # We need pip-system-certs in venv to use system certificates,
+        # pip-system-certs in Python is not used by pip, pipenv nor poetry from venv.
         pip_args = ["install", package_manager, "pip-system-certs"]
         if sys.version_info >= (3, 11):
             # Use the new trust store feature in Python 3.11
