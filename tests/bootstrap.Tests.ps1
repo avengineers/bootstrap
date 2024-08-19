@@ -258,7 +258,7 @@ Describe "Install-Python" {
         Install-Python
 
         Should -Invoke -CommandName Invoke-CommandLine -Exactly 0
-        Should -Invoke -CommandName Write-Output -Exactly 2
-        Should -Invoke -CommandName Write-Output -Exactly 1 -ParameterFilter { $InputObject -eq "python311 found in somebloodypath" }
+        Should -Invoke -CommandName Write-Output -Exactly 1
+        Should -Invoke -CommandName Write-Output -Exactly 1 -ParameterFilter { $InputObject -eq "python311 found in somebloodypath, skipping installation." }
     }
 }

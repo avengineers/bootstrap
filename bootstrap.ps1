@@ -91,7 +91,7 @@ function Install-Scoop {
 
     Write-Output "Applying scoop configuration"
     foreach ($item in $config.scoop_config.GetEnumerator()) {
-        Invoke-CommandLine ("scoop config " + $item.Key + " " + $item.Value) -Silent $true
+        Invoke-CommandLine ("scoop config " + $item.Key + " " + $item.Value) -Silent $true -PrintCommand $false
     }
 
     # Install any installer dependencies
@@ -105,7 +105,7 @@ function Install-Scoop {
         "dark.json"
     )
     $manifests | ForEach-Object {
-        Invoke-CommandLine "scoop install $($config.scoop_default_bucket_base_url)/$_" -Silent $true
+        Invoke-CommandLine "scoop install $($config.scoop_default_bucket_base_url)/$_" -Silent $true -PrintCommand $false
     }
 
     # Import scoopfile.json
@@ -144,14 +144,11 @@ function Install-Python {
         Write-Output "$python not found. Try to install $python via scoop ..."
         # Install python
         Invoke-CommandLine "scoop install $($config.scoop_python_bucket_base_url)/$python.json"
+
+        Initialize-EnvPath
     }
     else {
-        Write-Output "$python found in $pythonPath"
-        # Extract the directory of python exe file and add it to PATH. It needs to be the first entry in PATH
-        # such that this version is used when the user calls python and not python311
-        $pythonDir = [System.IO.Path]::GetDirectoryName($pythonPath)
-        Write-Output "Adding $pythonDir to PATH"
-        $Env:Path += ";$pythonDir"
+        Write-Output "$python found in $pythonPath, skipping installation."
     }
 }
 
