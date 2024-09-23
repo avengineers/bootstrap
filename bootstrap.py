@@ -375,7 +375,7 @@ class CreateVirtualEnvironment(Runnable):
             if pypi_source:
                 pip_args.extend(["--trusted-host", urlparse(pypi_source.url).hostname])
         self.virtual_env.pip(pip_args)
-        self.virtual_env.run([self.package_manager_name, "install", *package_manager_args])
+        self.virtual_env.run(["python", "-m", self.package_manager_name, "install", *package_manager_args])
         return 0
 
     @staticmethod
