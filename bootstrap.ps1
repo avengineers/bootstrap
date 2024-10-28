@@ -153,6 +153,23 @@ function Install-Python {
     }
 }
 
+function Get-PythonExecutableName {
+    param (
+        [string]$pythonVersion
+    )
+
+    # Split the version and handle varying segment lengths
+    $version_parts = $pythonVersion.Split(".")
+    $major_minor_version = $version_parts[0]  # Always include the major version
+
+    # Append the minor version if it exists
+    if ($version_parts.Count -ge 2) {
+        $major_minor_version += $version_parts[1]
+    }
+
+    return "python" + $major_minor_version
+}
+
 # Main function needed for testing (will be mocked)
 function Main {
     Install-Scoop
@@ -176,7 +193,9 @@ $ErrorActionPreference = "Stop"
 $config = Get-BootstrapConfig
 
 # python executable name
-$python = "python" + $config.python_version.Replace(".", "")
+$python = Get-PythonExecutableName -pythonVersion $config.python_version
+
+Write-Output "Python executable: $python"
 
 Main
 

@@ -262,3 +262,22 @@ Describe "Install-Python" {
         Should -Invoke -CommandName Write-Output -Exactly 1 -ParameterFilter { $InputObject -eq "python311 found in somebloodypath, skipping installation." }
     }
 }
+
+
+Describe "Get-PythonExecutableName" {
+    It "should only consider major and minor version" {
+        # Act
+        $python_version = Get-PythonExecutableName -pythonVersion "3.9.1"
+
+        # Assert
+        $python_version | Should -Be "python39"
+    }
+    
+    It "should only consider major version" {
+        # Act
+        $python_version = Get-PythonExecutableName -pythonVersion "4"
+
+        # Assert
+        $python_version | Should -Be "python4"
+    }
+}
