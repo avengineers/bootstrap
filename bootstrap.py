@@ -11,9 +11,12 @@ import venv
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
+from functools import total_ordering
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from urllib.parse import urlparse
+
+import pip
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("bootstrap")
@@ -28,6 +31,25 @@ if bootstrap_json_path.exists():
 else:
     package_manager = "poetry>=1.7.1"
     package_manager_args = []
+
+@total_ordering
+class Version:
+    def __init__(self, version_str: str) -> None:
+        self.version = self.parse_version(version_str)
+
+    @staticmethod
+    def parse_version(version_str: str) -> Tuple[int, ...]:
+        """Convert a version string into a tuple of integers for comparison."""
+        return tuple(map(int, re.split(r'\D+', version_str)))
+
+    def __eq__(self, other):
+        return self.version == other.version
+
+    def __lt__(self, other):
+        return self.version < other.version
+
+    def __repr__(self):
+        return f"Version({'.'.join(map(str, self.version))})"
 
 
 @dataclass
@@ -216,7 +238,7 @@ class SubprocessExecutor:
             # print all virtual environment variables
             logger.debug(json.dumps(dict(os.environ), indent=4))
             result = subprocess.run(
-                self.command.split(),  # noqa: S603
+                self.command.split(),
                 cwd=current_dir,
                 capture_output=self.capture_output,
                 text=True,  # to get stdout and stderr as strings instead of bytes
@@ -260,7 +282,6 @@ class VirtualEnvironment(ABC):
         # The pip configuration file should be in the virtual environment directory %VIRTUAL_ENV%
         pip_ini_path = self.pip_config_path()
         with open(pip_ini_path, "w") as pip_ini_file:
-            match_host = re.match(r"https?://([^/]+)", index_url)
             pip_ini_file.write(f"[global]\nindex-url = {index_url}\n")
             if not verify_ssl:
                 pip_ini_file.write("cert = false\n")
@@ -367,8 +388,8 @@ class CreateVirtualEnvironment(Runnable):
         # We need pip-system-certs in venv to use system certificates,
         # pip-system-certs in Python is not used by pip, pipenv nor poetry from venv.
         pip_args = ["install", package_manager, "pip-system-certs"]
-        if sys.version_info >= (3, 11):
-            # Use the new trust store feature in Python 3.11
+        # Use the new trust store feature in pip 22.2. After 24.2, the feature is enabled by default.
+        if Version("24.2") > Version(pip.__version__) >= Version("22.2"):
             pip_args.append("--use-feature=truststore")
         else:
             # Add trusted host of configured source for older Python versions
