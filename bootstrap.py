@@ -1,4 +1,5 @@
 import configparser
+import ensurepip
 import hashlib
 import json
 import logging
@@ -15,8 +16,6 @@ from functools import total_ordering
 from pathlib import Path
 from typing import List, Optional, Tuple
 from urllib.parse import urlparse
-
-import pip
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("bootstrap")
@@ -389,7 +388,7 @@ class CreateVirtualEnvironment(Runnable):
         # pip-system-certs in Python is not used by pip, pipenv nor poetry from venv.
         pip_args = ["install", package_manager, "pip-system-certs"]
         # Use the new trust store feature in pip 22.2. After 24.2, the feature is enabled by default.
-        if Version("24.2") > Version(pip.__version__) >= Version("22.2"):
+        if Version("24.2") > Version(ensurepip.version()) >= Version("22.2"):
             pip_args.append("--use-feature=truststore")
         else:
             # Add trusted host of configured source for older Python versions
