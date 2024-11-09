@@ -39,7 +39,7 @@ That's it! You're now ready to start developing your Python project using this r
   - python_package_manager = poetry
 
   General Scoop settings:
-  - scoop_installer = <https://raw.githubusercontent.com/xxthunder/ScoopInstall/v1.0.0/install.ps1>
+  - scoop_installer = <https://raw.githubusercontent.com/xxthunder/ScoopInstall/v1.1.0/install.ps1>
   - scoop_default_bucket_base_url = <https://raw.githubusercontent.com/ScoopInstaller/Main/master/bucket>
   - scoop_python_bucket_base_url = <https://raw.githubusercontent.com/ScoopInstaller/Versions/master/bucket>
 
