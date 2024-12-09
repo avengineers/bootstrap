@@ -12,6 +12,7 @@ __pycache__/
 
 # Environments
 .venv/
+Pipfile.lock
 
 # Any log file created
 *.log
