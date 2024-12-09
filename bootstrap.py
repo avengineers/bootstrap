@@ -31,6 +31,7 @@ else:
     package_manager = "poetry>=1.7.1"
     package_manager_args = []
 
+
 @total_ordering
 class Version:
     def __init__(self, version_str: str) -> None:
@@ -39,7 +40,7 @@ class Version:
     @staticmethod
     def parse_version(version_str: str) -> Tuple[int, ...]:
         """Convert a version string into a tuple of integers for comparison."""
-        return tuple(map(int, re.split(r'\D+', version_str)))
+        return tuple(map(int, re.split(r"\D+", version_str)))
 
     def __eq__(self, other):
         return self.version == other.version
@@ -379,21 +380,24 @@ class CreateVirtualEnvironment(Runnable):
             raise UserNotificationException(f"Could not extract the package manager name from {package_manager}")
 
     def run(self) -> int:
+        # Create the virtual environment if pip executable does not exist
         if not self.virtual_env.pip_path().exists():
             self.virtual_env.create()
+
+        # Get the PyPi source from pyproject.toml or Pipfile if it is defined
         pypi_source = PyPiSourceParser.from_pyproject(self.root_dir)
         if pypi_source:
             self.virtual_env.pip_configure(index_url=pypi_source.url, verify_ssl=True)
-        # We need pip-system-certs in venv to use system certificates,
-        # pip-system-certs in Python is not used by pip, pipenv nor poetry from venv.
+        # We need pip-system-certs in venv to use certificates, that are stored in the system's trust store,
         pip_args = ["install", package_manager, "pip-system-certs"]
-        # Use the new trust store feature in pip 22.2. After 24.2, the feature is enabled by default.
-        if Version("24.2") > Version(ensurepip.version()) >= Version("22.2"):
-            pip_args.append("--use-feature=truststore")
-        else:
+        # but to install it, we need either a pip version with the trust store feature or to trust the host
+        # (trust store feature enabled by default since 24.2)
+        if Version(ensurepip.version()) < Version("24.2"):
             # Add trusted host of configured source for older Python versions
             if pypi_source:
                 pip_args.extend(["--trusted-host", urlparse(pypi_source.url).hostname])
+            else:
+                pip_args.extend(["--trusted-host", "pypi.org", "--trusted-host", "pypi.python.org", "--trusted-host", "files.pythonhosted.org"])
         self.virtual_env.pip(pip_args)
         self.virtual_env.run(["python", "-m", self.package_manager_name, "install", *package_manager_args])
         return 0

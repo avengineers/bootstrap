@@ -2,6 +2,7 @@
     "recommendations": [
         "ms-vscode.powershell",
         "tamasfe.even-better-toml",
-        "charliermarsh.ruff"
+        "charliermarsh.ruff",
+        "pspester.pester-test"
     ]
 }
