@@ -27,7 +27,7 @@ function Get-BootstrapConfig {
     $bootstrapConfig = @{
         python_version                = "3.11"
         python_package_manager        = "poetry"
-        scoop_installer               = "https://raw.githubusercontent.com/xxthunder/ScoopInstall/v1.1.0/install.ps1"
+        scoop_installer               = "https://raw.githubusercontent.com/avengineers/ScoopInstall/refs/tags/v1.1.0/install.ps1"
         scoop_installer_with_repo_arg = $false
         scoop_default_bucket_base_url = "https://raw.githubusercontent.com/ScoopInstaller/Main/master/bucket"
         scoop_python_bucket_base_url  = "https://raw.githubusercontent.com/ScoopInstaller/Versions/master/bucket"
@@ -35,7 +35,7 @@ function Get-BootstrapConfig {
         scoop_config                  = @{
             autostash_on_conflict = "true"
             use_lessmsi           = "true"
-            scoop_repo            = "https://github.com/xxthunder/Scoop.git"
+            scoop_repo            = "https://github.com/avengineers/Scoop.git"
             scoop_branch          = "develop"
         }
     }
