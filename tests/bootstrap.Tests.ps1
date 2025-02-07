@@ -14,53 +14,6 @@ BeforeAll {
     }
 }
 
-Describe "Convert-CustomObjectToHashtable" {
-    It "should convert a PSCustomObject to a hashtable" {
-        # Arrange
-        $customObject = [PSCustomObject]@{
-            Name = "John"
-            Age  = 30
-            City = "New York"
-        }
-
-        # Act
-        $result = Convert-CustomObjectToHashtable -CustomObject $customObject
-
-        # Assert
-        $result.Name | Should -Be "John"
-        $result.Age | Should -Be 30
-        $result.City | Should -Be "New York"
-    }
-
-    It "should handle an empty PSCustomObject" {
-        # Arrange
-        $customObject = [PSCustomObject]@{}
-
-        # Act
-        $result = Convert-CustomObjectToHashtable -CustomObject $customObject
-
-        # Assert
-        $result | Should -BeLike @{ }
-    }
-
-    It "should handle a PSCustomObject with null values" {
-        # Arrange
-        $customObject = [PSCustomObject]@{
-            Name = $null
-            Age  = $null
-            City = $null
-        }
-
-        # Act
-        $result = Convert-CustomObjectToHashtable -CustomObject $customObject
-
-        # Assert
-        $result.Name | Should -Be $null
-        $result.Age | Should -Be $null
-        $result.City | Should -Be $null
-    }
-}
-
 Describe "Get-BootstrapConfig" {
     It "should return the default configuration" {
         # Arrange
@@ -127,6 +80,7 @@ Describe "Install-Scoop" {
         Mock -CommandName Invoke-CommandLine -MockWith {}
         Mock -CommandName Initialize-EnvPath -MockWith {}
         Mock -CommandName Invoke-Expression -MockWith {}
+        Mock -CommandName Import-ScoopFile -MockWith {}
     }
 
     It "shall not install scoop if scoop is already available" {
@@ -176,9 +130,8 @@ Describe "Install-Scoop" {
 
         Install-Scoop
 
-        Should -Invoke -CommandName Invoke-CommandLine -Exactly 10
-        Should -Invoke -CommandName Invoke-CommandLine -Exactly 1 -ParameterFilter { $CommandLine -eq "scoop update" }
-        Should -Invoke -CommandName Invoke-CommandLine -Exactly 1 -ParameterFilter { $CommandLine -eq "scoop import scoopfile.json --reset" }
+        Should -Invoke -CommandName Invoke-CommandLine -Exactly 8
+        Should -Invoke -CommandName Import-ScoopFile -Exactly 1 -ParameterFilter { $ScoopFilePath -eq "scoopfile.json" }
     }
 
     It "shall not import scoopfile.json if scoop_ignore_scoopfile is configured" {

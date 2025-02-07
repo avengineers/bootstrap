@@ -3,25 +3,6 @@
     Wrapper for installing dependencies of a project
 #>
 
-function Convert-CustomObjectToHashtable {
-    param (
-        [Parameter(Mandatory = $true, Position = 0)]
-        [AllowEmptyString()]
-        [PSCustomObject]$CustomObject
-    )
-
-    # Create an empty hashtable
-    $hashtable = @{}
-
-    # Iterate through the properties of the PSCustomObject
-    $CustomObject.psobject.properties | ForEach-Object {
-        $hashtable[$_.Name] = $_.Value
-    }
-
-    # Return the hashtable
-    return $hashtable
-}
-
 # Load configuration from bootstrap.json or use default values
 function Get-BootstrapConfig {
     $bootstrapConfig = @{
@@ -111,12 +92,9 @@ function Install-Scoop {
 
     # Import scoopfile.json
     if ((-Not $config.scoop_ignore_scoopfile) -and (Test-Path -Path 'scoopfile.json')) {
-        Write-Output "File 'scoopfile.json' found, running 'scoop import' ..."
+        Write-Output "File 'scoopfile.json' found, installing ..."
 
-        Invoke-CommandLine "scoop update"
-
-        # TODO: scoop's import feature is not working properly, do it with our ScoopWrapper in Pypeline
-        Invoke-CommandLine "scoop import scoopfile.json --reset"
+        Import-ScoopFile -ScoopFilePath 'scoopfile.json'
 
         Initialize-EnvPath
     }
