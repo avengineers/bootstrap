@@ -3,6 +3,25 @@
     Utility methods for common tasks.
 #>
 
+function Convert-CustomObjectToHashtable {
+    param (
+        [Parameter(Mandatory = $true, Position = 0)]
+        [AllowEmptyString()]
+        [PSCustomObject]$CustomObject
+    )
+
+    # Create an empty hashtable
+    $hashtable = @{}
+
+    # Iterate through the properties of the PSCustomObject
+    $CustomObject.psobject.properties | ForEach-Object {
+        $hashtable[$_.Name] = $_.Value
+    }
+
+    # Return the hashtable
+    return $hashtable
+}
+
 function Invoke-CommandLine {
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingInvokeExpression', '', Justification = 'Usually this statement must be avoided (https://learn.microsoft.com/en-us/powershell/scripting/learn/deep-dives/avoid-using-invoke-expression?view=powershell-7.3), here it is OK as it does not execute unknown code.')]
     param (
@@ -34,6 +53,110 @@ function Invoke-CommandLine {
             Write-Output "Command line call `"$CommandLine`" failed with exit code $global:LASTEXITCODE, continuing ..."
         }
     }
+}
+
+function Convert-ScoopFileJsonToHashTable {
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$ScoopFileJson
+    )
+
+    $return = @{
+        "buckets" = @();
+        "apps"    = @() 
+    }
+
+    $scoopFileData = ConvertFrom-Json -InputObject $ScoopFileJson
+
+    if ($scoopFileData.buckets -is [System.Collections.IEnumerable]) {
+        foreach ($bucket in $scoopFileData.buckets) {
+            $return.buckets += @{
+                "Name"   = $bucket.Name
+                "Source" = $bucket.Source
+            }
+        }
+    }
+
+    if ($scoopFileData.apps -is [System.Collections.IEnumerable]) {
+        foreach ($app in $scoopFileData.apps) {
+            $return.apps += @{
+                "Name"       = $app.Name
+                "Source"     = $app.Source
+                "Version"    = $app.Version
+                "Identifier" = if ($app.Version) { "$($app.Source)/$($app.Name)@$($app.Version)" } else { "$($app.Source)/$($app.Name)" }
+            }
+        }
+    }
+
+    return $return
+}
+
+function Import-ScoopFile {
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$ScoopFilePath
+    )
+
+    $scoopFileData = Convert-ScoopFileJsonToHashTable -ScoopFileJson (Get-Content -Path $ScoopFilePath -Raw)
+
+    # Add the buckets
+    $scoopFileData.buckets | ForEach-Object {
+        $bucket = $_
+        Write-Output "Processing bucket: $($bucket.Name)"
+        # We try to add each bucket, even if it already exists (we ignore any error here)
+        Invoke-CommandLine "scoop bucket add $($bucket.Name) $($bucket.Source)" -StopAtError $false
+    }
+
+    # Update buckets only if there are any buckets or apps to process
+    if ($scoopFileData.buckets.Count -gt 0 -or $scoopFileData.apps.Count -gt 0) {
+        Invoke-CommandLine "scoop update"
+    }
+
+    # Install the apps
+    $scoopFileData.apps | ForEach-Object {
+        $app = $_
+        Write-Output "Processing app: $($app.Name)"
+        Invoke-CommandLine "scoop install $($app.Identifier)"
+
+        # TODO: Replace this by some scoop env mechanism in the .venv directory
+        Invoke-CommandLine "scoop reset $($app.Identifier)"
+    }
+}
+
+function Add-ScoopToPath {
+    param (
+        [Parameter(Mandatory = $true, Position = 0)]
+        [string]$ScoopFilePath
+    )
+
+    # Read the content of the scoopfile.json
+    $scoopFileContent = Get-Content -Path $ScoopFilePath -Raw | ConvertFrom-Json
+
+    # Iterate over each app in the scoopfile
+    foreach ($app in $scoopFileContent.apps) {
+        Write-Output "Processing app: $($app.Name)"
+
+        # Extract the app details from the dictionary
+        $source = $app.Source
+        $name = $app.Name
+        $version = $app.Version
+
+        # Construct the scoop info command
+        $appIdentifier = if ($version) { "$source/$name@$version" } else { "$source/$name" }
+
+        # Get the scoop info for the app with --verbose flag
+        $appInfo = scoop info $appIdentifier --verbose
+
+        # Check if the appInfo contains 'Path Added'
+        if ($appInfo.'Path Added') {
+            $pathAdded = $appInfo.'Path Added'
+
+            $env:PATH = "$pathAdded;$env:PATH"
+            Write-Output "Added $pathAdded to PATH for app $appIdentifier"
+        }
+    }
+
+    Write-Output "Updated PATH: $env:PATH"
 }
 
 # Update/Reload current environment variable PATH with settings from registry
@@ -151,14 +274,17 @@ function Get-UserConfirmation {
     
     if (Test-RunningInCIorTestEnvironment) {
         return $valueForCi
-    } else {
+    }
+    else {
         $defaultText = if ($defaultValueForUser) { "[Y/n]" } else { "[y/N]" }
         $userResponse = Read-Host "$message $defaultText"
         if ($userResponse -eq '') {
             return $defaultValueForUser
-        } elseif ($userResponse -match '^[Yy]') {
+        }
+        elseif ($userResponse -match '^[Yy]') {
             return $true
-        } else {
+        }
+        else {
             return $false
         }
     }
