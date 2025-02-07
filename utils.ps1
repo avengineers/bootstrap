@@ -36,6 +36,41 @@ function Invoke-CommandLine {
     }
 }
 
+function Update-ScoopPath {
+    param (
+        [string]$ScoopFilePath
+    )
+
+    # Read the content of the scoopfile.json
+    $scoopFileContent = Get-Content -Path $ScoopFilePath -Raw | ConvertFrom-Json
+
+    # Iterate over each app in the scoopfile
+    foreach ($app in $scoopFileContent.apps) {
+        Write-Output "Processing app: $($app.Name)"
+
+        # Extract the app details from the dictionary
+        $source = $app.Source
+        $name = $app.Name
+        $version = $app.Version
+
+        # Construct the scoop info command
+        $appIdentifier = if ($version) { "$source/$name@$version" } else { "$source/$name" }
+
+        # Get the scoop info for the app with --verbose flag
+        $appInfo = scoop info $appIdentifier --verbose
+
+        # Check if the appInfo contains 'Path Added'
+        if ($appInfo.'Path Added') {
+            $pathAdded = $appInfo.'Path Added'
+
+            $env:PATH = "$pathAdded;$env:PATH"
+            Write-Output "Added $pathAdded to PATH for app $appIdentifier"
+        }
+    }
+
+    Write-Output "Updated PATH: $env:PATH"
+}
+
 # Update/Reload current environment variable PATH with settings from registry
 function Initialize-EnvPath {
     # workaround for system-wide installations (e.g. in GitHub Actions)
