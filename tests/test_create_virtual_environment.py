@@ -5,15 +5,15 @@ from bootstrap import CreateVirtualEnvironment
 
 
 def test_pip_configure(tmp_path: Path):
-    # input
+    # Arrange
     venv_dir = tmp_path / ".venv"
     venv_dir.mkdir(parents=True)
 
-    # call item under test
+    # Act
     my_venv = CreateVirtualEnvironment.instantiate_os_specific_venv(venv_dir)
     my_venv.pip_configure("https://my.pypi.org/simple/stable")
 
-    # check pip configuration
+    # Assert
     pip_ini = venv_dir / ("pip.ini" if sys.platform.startswith("win32") else "pip.conf")
     assert pip_ini.exists()
     assert (
@@ -24,10 +24,10 @@ index-url = https://my.pypi.org/simple/stable
 """
     )
 
-    # call item under test again with different index-url
+    # Act: call item under test again with different index-url
     my_venv.pip_configure("https://some.other.pypi.org/simple/stable", False)
 
-    # check changed pip configuration
+    # Assert
     assert (
         pip_ini.read_text()
         == """\
@@ -38,17 +38,32 @@ cert = false
     )
 
 
+def test_gitignore_configure(tmp_path: Path):
+    # Arrange
+    venv_dir = tmp_path / ".venv"
+    venv_dir.mkdir(parents=True)
+
+    # Act
+    my_venv = CreateVirtualEnvironment.instantiate_os_specific_venv(venv_dir)
+    my_venv.gitignore_configure()
+
+    # Assert
+    gitignore = venv_dir / ".gitignore"
+    assert gitignore.exists()
+    assert gitignore.read_text() == "*\n"
+
+
 def test_get_inputs(tmp_path: Path):
-    # some input files
+    # Arrange
     pipfile = tmp_path / "Pipfile"
     bootstrap_json = tmp_path / "bootstrap.json"
     bootstrap_py = tmp_path / ".bootstrap" / "bootstrap.py"
 
-    # call item under test
+    # Act
     creator = CreateVirtualEnvironment(tmp_path)
     inputs = creator.get_inputs()
 
-    # check list of input dependencies
+    # Assert
     assert pipfile in inputs
     assert bootstrap_json in inputs
     assert bootstrap_py in inputs

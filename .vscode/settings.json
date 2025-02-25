@@ -5,6 +5,11 @@
       "src",
       "tests"
    ],
+   "editor.formatOnSave": true,
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff"
+  },
+  "python.analysis.typeCheckingMode": "basic",
    "workbench.colorCustomizations": {
       "activityBar.activeBackground": "#ff6433",
       "activityBar.background": "#ff6433",
