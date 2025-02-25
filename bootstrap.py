@@ -92,12 +92,7 @@ class PyPiSourceParser:
                     return PyPiSource(name, url)
                 except KeyError:
                     raise UserNotificationException(
-                        f"Could not parse PyPi source from section {section.name}. "
-                        f"Please make sure the section has the following format:\n"
-                        f"[{source_section_name}]\n"
-                        f'name = "name"\n'
-                        f'url = "https://url"\n'
-                        f"verify_ssl = true"
+                        f'Could not parse PyPi source from section {section.name}. Please make sure the section has the following format:\n[{source_section_name}]\nname = "name"\nurl = "https://url"\nverify_ssl = true'
                     ) from None
         return None
 
@@ -245,7 +240,7 @@ class SubprocessExecutor:
             )  # nosec
             result.check_returncode()
         except subprocess.CalledProcessError as e:
-            raise UserNotificationException(f"Command '{self.command}' failed with:\n" f"{result.stdout if result else ''}\n" f"{result.stderr if result else e}") from e
+            raise UserNotificationException(f"Command '{self.command}' failed with:\n{result.stdout if result else ''}\n{result.stderr if result else e}") from e
 
 
 class VirtualEnvironment(ABC):
@@ -259,12 +254,19 @@ class VirtualEnvironment(ABC):
         """
         try:
             venv.create(env_dir=self.venv_dir, with_pip=True)
+            self.gitignore_configure()
         except PermissionError as e:
             if "python.exe" in str(e):
-                raise UserNotificationException(
-                    f"Failed to create virtual environment in {self.venv_dir}.\n" f"Virtual environment python.exe is still running. Please kill all instances and run again.\n" f"Error: {e}"
-                ) from e
-            raise UserNotificationException(f"Failed to create virtual environment in {self.venv_dir}.\n" f"Please make sure you have the necessary permissions.\n" f"Error: {e}") from e
+                raise UserNotificationException(f"Failed to create virtual environment in {self.venv_dir}.\nVirtual environment python.exe is still running. Please kill all instances and run again.\nError: {e}") from e
+            raise UserNotificationException(f"Failed to create virtual environment in {self.venv_dir}.\nPlease make sure you have the necessary permissions.\nError: {e}") from e
+
+    def gitignore_configure(self) -> None:
+        """
+        Create a .gitignore file in the virtual environment directory to ignore all files.
+        """
+        gitignore_path = self.venv_dir / ".gitignore"
+        with open(gitignore_path, "w") as gitignore_file:
+            gitignore_file.write("*\n")
 
     def pip_configure(self, index_url: str, verify_ssl: bool = True) -> None:
         """
@@ -279,7 +281,6 @@ class VirtualEnvironment(ABC):
             verify_ssl: Whether to verify SSL certificates when using pip.
 
         """
-        # The pip configuration file should be in the virtual environment directory %VIRTUAL_ENV%
         pip_ini_path = self.pip_config_path()
         with open(pip_ini_path, "w") as pip_ini_file:
             pip_ini_file.write(f"[global]\nindex-url = {index_url}\n")
