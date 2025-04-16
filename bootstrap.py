@@ -380,6 +380,12 @@ class CreateVirtualEnvironment(Runnable):
         else:
             raise UserNotificationException(f"Could not extract the package manager name from {package_manager}")
 
+    def get_install_argument(self) -> str:
+        """Determine the install argument based on the package manager name."""
+        if self.package_manager_name == "uv":
+            return "sync"
+        return "install"
+
     def run(self) -> int:
         # Create the virtual environment if pip executable does not exist
         if not self.virtual_env.pip_path().exists():
@@ -400,7 +406,7 @@ class CreateVirtualEnvironment(Runnable):
             else:
                 pip_args.extend(["--trusted-host", "pypi.org", "--trusted-host", "pypi.python.org", "--trusted-host", "files.pythonhosted.org"])
         self.virtual_env.pip(pip_args)
-        self.virtual_env.run(["python", "-m", self.package_manager_name, "install", *package_manager_args])
+        self.virtual_env.run(["python", "-m", self.package_manager_name, self.get_install_argument(), *package_manager_args])
         return 0
 
     @staticmethod
@@ -417,6 +423,7 @@ class CreateVirtualEnvironment(Runnable):
 
     def get_inputs(self) -> List[Path]:
         venv_relevant_files = [
+            "uv.lock",
             "poetry.lock",
             "poetry.toml",
             "pyproject.toml",
