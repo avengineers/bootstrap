@@ -322,7 +322,7 @@ class WindowsVirtualEnvironment(VirtualEnvironment):
         self.activate_script = self.venv_dir.joinpath("Scripts/activate")
 
     def pip_path(self) -> Path:
-        return self.venv_dir.joinpath("Scripts/python.exe -m pip")
+        return self.venv_dir.joinpath("Scripts/pip.exe")
 
     def pip_config_path(self) -> Path:
         return self.venv_dir.joinpath("pip.ini")
