@@ -12,8 +12,10 @@ def test_pip_configure(tmp_path: Path):
     # Act
     my_venv = CreateVirtualEnvironment.instantiate_os_specific_venv(venv_dir)
     my_venv.pip_configure("https://my.pypi.org/simple/stable")
+    my_venv.create()
 
     # Assert
+    assert my_venv.pip_path().exists()  # Make sure the pip path is properly set
     pip_ini = venv_dir / ("pip.ini" if sys.platform.startswith("win32") else "pip.conf")
     assert pip_ini.exists()
     assert (

@@ -17,7 +17,6 @@ pytest-mock = "^3.3"
 
 [tool.pytest.ini_options]
 addopts = "-v -Wdefault"
-pythonpaths = ["src"]
 testpaths = ["tests"]
 
 [tool.ruff]
