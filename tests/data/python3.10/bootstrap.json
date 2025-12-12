@@ -1,4 +1,4 @@
 {
     "python_version": "3.10",
-    "python_package_manager": "pipenv>=2024.0.3"
+    "python_package_manager": "poetry>=2.1.0"
 }

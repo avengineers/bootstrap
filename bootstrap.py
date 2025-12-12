@@ -5,31 +5,81 @@ import json
 import logging
 import os
 import re
+import shutil
 import subprocess  # nosec
 import sys
-import tempfile
 import venv
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from functools import total_ordering
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 from urllib.parse import urlparse
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("bootstrap")
 
 
-bootstrap_json_path = Path.cwd() / "bootstrap.json"
-if bootstrap_json_path.exists():
-    with bootstrap_json_path.open("r") as f:
-        config = json.load(f)
-    package_manager = config.get("python_package_manager", "poetry>=1.7.1")
-    package_manager_args = config.get("python_package_manager_args", [])
-else:
-    package_manager = "poetry>=1.7.1"
-    package_manager_args = []
+DEFAULT_PACKAGE_MANAGER = "poetry>=2.1.0"
+DEFAULT_BOOTSTRAP_PACKAGES = ["pip-system-certs>=4.0,<5.0"]
+BOOTSTRAP_COMPLETE_MARKER = ".bootstrap-complete"
+VENV_PYTHON_VERSION_MARKER = ".python_version"
+
+
+@dataclass
+class BootstrapConfig:
+    """Configuration for the bootstrap process loaded from bootstrap.json."""
+
+    python_version: str = ""
+    package_manager: str = DEFAULT_PACKAGE_MANAGER
+    package_manager_args: List[str] = field(default_factory=list)
+    bootstrap_packages: List[str] = field(default_factory=lambda: list(DEFAULT_BOOTSTRAP_PACKAGES))
+    bootstrap_cache_dir: Optional[Path] = None
+    venv_install_command: Optional[str] = None
+
+    @classmethod
+    def from_json_file(cls, json_path: Path) -> "BootstrapConfig":
+        """Load configuration from a JSON file."""
+        if not json_path.exists():
+            return cls()
+
+        with json_path.open("r") as file_handle:
+            data = json.load(file_handle)
+
+        bootstrap_packages = data.get("bootstrap_packages", list(DEFAULT_BOOTSTRAP_PACKAGES))
+
+        cache_dir_str = data.get("bootstrap_cache_dir")
+        cache_dir = Path(cache_dir_str).expanduser() if cache_dir_str else None
+
+        return cls(
+            python_version=data.get("python_version", ""),
+            package_manager=data.get("python_package_manager", DEFAULT_PACKAGE_MANAGER),
+            package_manager_args=data.get("python_package_manager_args", []),
+            bootstrap_packages=bootstrap_packages,
+            bootstrap_cache_dir=cache_dir,
+            venv_install_command=data.get("venv_install_command"),
+        )
+
+    def get_bootstrap_cache_dir(self) -> Path:
+        """Return the bootstrap cache directory, defaulting to ~/.bootstrap."""
+        if self.bootstrap_cache_dir:
+            return self.bootstrap_cache_dir
+        return Path.home() / ".bootstrap"
+
+    def compute_bootstrap_env_hash(self) -> str:
+        """Compute a hash for the bootstrap environment based on configuration."""
+        if self.python_version:
+            python_major_minor = ".".join(self.python_version.split(".")[:2])
+        else:
+            python_major_minor = f"{sys.version_info[0]}.{sys.version_info[1]}"
+        components = [
+            f"python={python_major_minor}",
+            f"manager={self.package_manager}",
+            f"packages={sorted(self.bootstrap_packages)}",
+        ]
+        content = "|".join(str(component) for component in components)
+        return hashlib.sha256(content.encode()).hexdigest()[:12]
 
 
 @total_ordering
@@ -39,16 +89,17 @@ class Version:
 
     @staticmethod
     def parse_version(version_str: str) -> Tuple[int, ...]:
-        """Convert a version string into a tuple of integers for comparison."""
         return tuple(map(int, re.split(r"\D+", version_str)))
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Version):
+            return NotImplemented
         return self.version == other.version
 
-    def __lt__(self, other):
+    def __lt__(self, other: "Version") -> bool:
         return self.version < other.version
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"Version({'.'.join(map(str, self.version))})"
 
 
@@ -133,11 +184,16 @@ class Runnable(ABC):
     def get_outputs(self) -> List[Path]:
         """Get stage outputs"""
 
+    def get_config(self) -> Optional[dict[str, Any]]:
+        """Get stage configuration for change detection."""
+        return None
+
 
 class RunInfoStatus(Enum):
     MATCH = (False, "Nothing has changed, previous execution information matches.")
     NO_INFO = (True, "No previous execution information found.")
     FILE_CHANGED = (True, "Dependencies have been changed.")
+    CONFIG_CHANGED = (True, "Configuration has been changed.")
 
     def __init__(self, should_run: bool, message: str) -> None:
         self.should_run = should_run
@@ -172,6 +228,7 @@ class Executor:
         file_info = {
             "inputs": {str(path): self.get_file_hash(path) for path in runnable.get_inputs()},
             "outputs": {str(path): self.get_file_hash(path) for path in runnable.get_outputs()},
+            "config": runnable.get_config() or {},
         }
 
         run_info_path = self.get_runnable_run_info_file(runnable)
@@ -191,6 +248,12 @@ class Executor:
         with run_info_path.open() as f:
             previous_info = json.load(f)
 
+        # Check if config has changed
+        current_config = runnable.get_config() or {}
+        previous_config = previous_info.get("config", {})
+        if current_config != previous_config:
+            return RunInfoStatus.CONFIG_CHANGED
+
         for file_type in ["inputs", "outputs"]:
             for path_str, previous_hash in previous_info[file_type].items():
                 path = Path(path_str)
@@ -201,11 +264,11 @@ class Executor:
     def execute(self, runnable: Runnable) -> int:
         run_info_status = self.previous_run_info_matches(runnable)
         if run_info_status.should_run:
-            logger.info(f"Runnable '{runnable.get_name()}' must run. {run_info_status.message}")
+            logger.info(f"Executing '{runnable.get_name()}': {run_info_status.message}")
             exit_code = runnable.run()
             self.store_run_info(runnable)
             return exit_code
-        logger.info(f"Runnable '{runnable.get_name()}' execution skipped. {run_info_status.message}")
+        logger.info(f"Skipping '{runnable.get_name()}': {run_info_status.message}")
 
         return 0
 
@@ -291,132 +354,314 @@ class VirtualEnvironment(ABC):
         SubprocessExecutor([self.pip_path().as_posix(), *args]).execute()
 
     @abstractmethod
+    def python_path(self) -> Path:
+        """Get the path to the Python executable within the virtual environment."""
+
+    @abstractmethod
     def pip_path(self) -> Path:
-        """
-        Get the path to the pip executable within the virtual environment.
-        """
+        """Get the path to the pip executable within the virtual environment."""
 
     @abstractmethod
     def pip_config_path(self) -> Path:
-        """
-        Get the path to the pip configuration file within the virtual environment.
-        """
+        """Get the path to the pip configuration file within the virtual environment."""
 
     @abstractmethod
-    def run(self, args: List[str], capture_output: bool = True) -> None:
+    def scripts_path(self) -> Path:
+        """Get the path to the Scripts (Windows) or bin (Unix) directory within the virtual environment."""
+
+    def run(self, args: List[str], capture_output: bool = True, cwd: Optional[Path] = None) -> None:
         """
-        Run an arbitrary command within the virtual environment. This method should behave as if the
-        user had activated the virtual environment and run the given command from the command line.
+        Run an arbitrary command within the virtual environment using the venv's Python.
+
+        If the first argument is 'python', it will be replaced with the full path
+        to the virtual environment's Python executable.
 
         Args:
         ----
-            *args: Command-line arguments. For example, `run('python', 'setup.py', 'install')`
-                   should behave similarly to `python setup.py install` at the command line.
+            args: Command-line arguments. For example, `run(['python', '-m', 'poetry', 'install'])`
+            capture_output: Whether to capture stdout/stderr.
+            cwd: Working directory for the command.
 
         """
+        command = list(args)
+        if command and command[0] == "python":
+            command[0] = self.python_path().as_posix()
+        SubprocessExecutor(command, cwd=cwd, capture_output=capture_output).execute()
 
 
 class WindowsVirtualEnvironment(VirtualEnvironment):
     def __init__(self, venv_dir: Path) -> None:
         super().__init__(venv_dir)
-        self.activate_script = self.venv_dir.joinpath("Scripts/activate")
+
+    def python_path(self) -> Path:
+        return self.scripts_path().joinpath("python.exe")
 
     def pip_path(self) -> Path:
-        return self.venv_dir.joinpath("Scripts/pip.exe")
+        return self.scripts_path().joinpath("pip.exe")
 
     def pip_config_path(self) -> Path:
         return self.venv_dir.joinpath("pip.ini")
 
-    def run(self, args: List[str], capture_output: bool = True) -> None:
-        SubprocessExecutor(
-            command=[f"cmd /c {self.activate_script.as_posix()} && ", *args],
-            capture_output=capture_output,
-        ).execute()
+    def scripts_path(self) -> Path:
+        return self.venv_dir.joinpath("Scripts")
 
 
 class UnixVirtualEnvironment(VirtualEnvironment):
     def __init__(self, venv_dir: Path) -> None:
         super().__init__(venv_dir)
-        self.activate_script = self.venv_dir.joinpath("bin/activate")
+
+    def python_path(self) -> Path:
+        return self.scripts_path().joinpath("python")
 
     def pip_path(self) -> Path:
-        return self.venv_dir.joinpath("bin/pip")
+        return self.scripts_path().joinpath("pip")
 
     def pip_config_path(self) -> Path:
         return self.venv_dir.joinpath("pip.conf")
 
-    def run(self, args: List[str], capture_output: bool = True) -> None:
-        # Create a temporary shell script
-        with tempfile.NamedTemporaryFile("w", delete=False, suffix=".sh") as f:
-            f.write("#!/bin/bash\n")  # Add a shebang line
-            f.write(f"source {self.activate_script.as_posix()}\n")  # Write the activate command
-            f.write(" ".join(args))  # Write the provided command
-            temp_script_path = f.name  # Get the path of the temporary script
+    def scripts_path(self) -> Path:
+        return self.venv_dir.joinpath("bin")
 
-        # Make the temporary script executable
-        SubprocessExecutor(["chmod", "+x", temp_script_path]).execute()
-        # Run the temporary script
-        SubprocessExecutor(
-            command=[f"{Path(temp_script_path).as_posix()}"],
-            capture_output=capture_output,
-        ).execute()
-        # Delete the temporary script
-        os.remove(temp_script_path)
+
+def instantiate_os_specific_venv(venv_dir: Path) -> VirtualEnvironment:
+    """Create an OS-specific VirtualEnvironment instance."""
+    if sys.platform.startswith("win32"):
+        return WindowsVirtualEnvironment(venv_dir)
+    elif sys.platform.startswith("linux") or sys.platform.startswith("darwin"):
+        return UnixVirtualEnvironment(venv_dir)
+    else:
+        raise UserNotificationException(f"Unsupported operating system: {sys.platform}")
+
+
+def extract_package_manager_name(package_manager_spec: str) -> str:
+    """Extract the package manager name from a specification like 'poetry>=1.7.1'."""
+    match = re.match(r"^([a-zA-Z0-9_-]+)", package_manager_spec)
+    if match:
+        return match.group(1)
+    raise UserNotificationException(f"Could not extract the package manager name from {package_manager_spec}")
+
+
+class CreateBootstrapEnvironment(Runnable):
+    """Creates a shared bootstrap environment with the package manager installed.
+
+    The bootstrap environment is stored in a user-level cache directory
+    (default: ~/.bootstrap/<hash>/) and is shared across projects with
+    the same configuration.
+    """
+
+    def __init__(self, config: BootstrapConfig, project_dir: Path) -> None:
+        self.config = config
+        self.project_dir = project_dir
+        self.env_hash = config.compute_bootstrap_env_hash()
+        self.bootstrap_env_dir = config.get_bootstrap_cache_dir() / self.env_hash
+        self.venv_dir = self.bootstrap_env_dir / ".venv"
+        self.virtual_env = instantiate_os_specific_venv(self.venv_dir)
+        self.marker_file = self.bootstrap_env_dir / BOOTSTRAP_COMPLETE_MARKER
+
+    def run(self) -> int:
+        self._create_environment_atomic()
+        return 0
+
+    def _is_valid_environment(self) -> bool:
+        """Check if the bootstrap environment exists and is valid."""
+        if not self.marker_file.exists():
+            return False
+
+        try:
+            stored_hash = self.marker_file.read_text().strip()
+            if stored_hash != self.env_hash:
+                logger.info(f"Bootstrap environment hash mismatch: {stored_hash} != {self.env_hash}")
+                return False
+        except OSError:
+            return False
+
+        if not self.virtual_env.pip_path().exists():
+            logger.info("Bootstrap environment pip not found, will recreate.")
+            return False
+
+        return True
+
+    def _create_environment_atomic(self) -> None:
+        """Create the bootstrap environment, replacing any existing invalid environment."""
+        try:
+            # Remove existing directory if present (invalid or leftover from failed attempt)
+            if self.bootstrap_env_dir.exists():
+                logger.info(f"Removing existing bootstrap environment at {self.bootstrap_env_dir}")
+                shutil.rmtree(self.bootstrap_env_dir)
+
+            # Create bootstrap environment directory
+            self.bootstrap_env_dir.mkdir(parents=True, exist_ok=True)
+            bootstrap_venv = instantiate_os_specific_venv(self.venv_dir)
+
+            logger.info(f"Creating bootstrap environment in {self.bootstrap_env_dir}")
+            venv.create(env_dir=self.venv_dir, with_pip=True)
+
+            # Configure pip with PyPI source if available
+            pypi_source = PyPiSourceParser.from_pyproject(self.project_dir)
+            if pypi_source:
+                bootstrap_venv.pip_configure(index_url=pypi_source.url, verify_ssl=True)
+
+            # Build pip install arguments
+            packages_to_install = [self.config.package_manager, *self.config.bootstrap_packages]
+            pip_args = ["install", *packages_to_install]
+
+            # Handle SSL certificates for older pip versions
+            if Version(ensurepip.version()) < Version("24.2"):
+                if pypi_source and (hostname := urlparse(pypi_source.url).hostname):
+                    pip_args.extend(["--trusted-host", hostname])
+                else:
+                    pip_args.extend(
+                        [
+                            "--trusted-host",
+                            "pypi.org",
+                            "--trusted-host",
+                            "pypi.python.org",
+                            "--trusted-host",
+                            "files.pythonhosted.org",
+                        ]
+                    )
+
+            logger.info(f"Installing bootstrap packages: {packages_to_install}")
+            bootstrap_venv.pip(pip_args)
+
+            # Write the completion marker
+            marker_path = self.bootstrap_env_dir / BOOTSTRAP_COMPLETE_MARKER
+            marker_path.write_text(self.env_hash)
+
+            # Update the virtual_env reference
+            self.virtual_env = instantiate_os_specific_venv(self.venv_dir)
+
+            logger.info(f"Bootstrap environment created successfully at {self.bootstrap_env_dir}")
+
+        except Exception as exc:
+            logger.error(f"Bootstrap environment creation failed at {self.bootstrap_env_dir}")
+            raise UserNotificationException(f"Failed to create bootstrap environment: {exc}") from exc
+
+    def get_name(self) -> str:
+        return "create-bootstrap-environment"
+
+    def get_inputs(self) -> List[Path]:
+        # No file-based inputs for shared bootstrap environment
+        return []
+
+    def get_outputs(self) -> List[Path]:
+        return [self.marker_file]
+
+    def get_config(self) -> Optional[dict[str, Any]]:
+        """Return configuration that affects the bootstrap environment."""
+        return {
+            "package_manager": self.config.package_manager,
+            "bootstrap_packages": sorted(self.config.bootstrap_packages),
+            "python_version": self.config.python_version,
+        }
 
 
 class CreateVirtualEnvironment(Runnable):
-    def __init__(self, root_dir) -> None:
+    """Creates the project virtual environment using the bootstrap environment's package manager."""
+
+    def __init__(
+        self,
+        root_dir: Path,
+        bootstrap_env: CreateBootstrapEnvironment,
+    ) -> None:
         self.root_dir = root_dir
         self.venv_dir = self.root_dir / ".venv"
         self.bootstrap_dir = self.root_dir / ".bootstrap"
-        self.virtual_env = self.instantiate_os_specific_venv(self.venv_dir)
+        self.virtual_env = instantiate_os_specific_venv(self.venv_dir)
+        self.bootstrap_env = bootstrap_env
+        self.config = bootstrap_env.config
+        self.python_version_marker = self.venv_dir / VENV_PYTHON_VERSION_MARKER
 
     @property
     def package_manager_name(self) -> str:
-        match = re.match(r"^([a-zA-Z0-9_-]+)", package_manager)
+        return extract_package_manager_name(self.config.package_manager)
 
-        if match:
-            return match.group(1)
-        else:
-            raise UserNotificationException(f"Could not extract the package manager name from {package_manager}")
+    def _check_python_version_compatibility(self) -> None:
+        """Check if the existing venv was created with the same Python version.
 
-    def get_install_argument(self) -> str:
-        """Determine the install argument based on the package manager name."""
+        If the Python version has changed (e.g., switching branches), delete the
+        existing venv so it can be recreated by the package manager.
+        """
+        if not self.venv_dir.exists():
+            return
+
+        current_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+
+        if not self.python_version_marker.exists():
+            logger.info(f"No Python version marker found in {self.venv_dir}. This venv may have been created before version tracking was added. Deleting {self.venv_dir} to ensure clean state.")
+            shutil.rmtree(self.venv_dir)
+            return
+
+        try:
+            stored_version = self.python_version_marker.read_text().strip()
+            if stored_version != current_version:
+                logger.info(f"Python version changed from {stored_version} to {current_version}. Deleting {self.venv_dir} for recreation.")
+                shutil.rmtree(self.venv_dir)
+        except OSError as exc:
+            logger.warning(f"Could not read Python version marker: {exc}")
+
+    def _write_python_version_marker(self, version: str) -> None:
+        """Write the Python version marker to track the venv's Python version."""
+        try:
+            self.python_version_marker.write_text(version)
+        except OSError as exc:
+            logger.warning(f"Could not write Python version marker: {exc}")
+
+    def _ensure_in_project_venv(self) -> None:
+        """Configure package managers to create venv in-project (.venv in repository)."""
+        if self.package_manager_name == "poetry":
+            # Set environment variable for poetry to create venv in-project
+            os.environ["POETRY_VIRTUALENVS_IN_PROJECT"] = "true"
+        elif self.package_manager_name == "pipenv":
+            # Set environment variable for pipenv
+            os.environ["PIPENV_VENV_IN_PROJECT"] = "1"
+        # UV creates .venv in-project by default, no configuration needed
+
+    def _ensure_correct_python_version(self) -> None:
+        """Ensure the correct Python version is used in the virtual environment."""
+        if self.package_manager_name == "poetry":
+            # Make Poetry use the Python interpreter it's being run with
+            os.environ["POETRY_VIRTUALENVS_PREFER_ACTIVE_PYTHON"] = "false"
+            os.environ["POETRY_VIRTUALENVS_USE_POETRY_PYTHON"] = "true"
+
+    def _get_install_argument(self) -> str:
         if self.package_manager_name == "uv":
             return "sync"
         return "install"
 
+    def _get_install_command(self) -> List[str]:
+        if self.config.venv_install_command:
+            return self.config.venv_install_command.split()
+
+        return [
+            str(self.bootstrap_env.virtual_env.scripts_path() / self.package_manager_name),
+            self._get_install_argument(),
+            *self.config.package_manager_args,
+        ]
+
     def run(self) -> int:
-        # Create the virtual environment if pip executable does not exist
-        if not self.virtual_env.pip_path().exists():
-            self.virtual_env.create()
+        self._check_python_version_compatibility()
+        self._ensure_in_project_venv()
+        self._ensure_correct_python_version()
 
         # Get the PyPi source from pyproject.toml or Pipfile if it is defined
         pypi_source = PyPiSourceParser.from_pyproject(self.root_dir)
-        if pypi_source:
-            self.virtual_env.pip_configure(index_url=pypi_source.url, verify_ssl=True)
-        # We need pip-system-certs in venv to use certificates, that are stored in the system's trust store,
-        pip_args = ["install", package_manager, "pip-system-certs>=4.0,<5.0"]
-        # but to install it, we need either a pip version with the trust store feature or to trust the host
-        # (trust store feature enabled by default since 24.2)
-        if Version(ensurepip.version()) < Version("24.2"):
-            # Add trusted host of configured source for older Python versions
-            if pypi_source:
-                pip_args.extend(["--trusted-host", urlparse(pypi_source.url).hostname])
-            else:
-                pip_args.extend(["--trusted-host", "pypi.org", "--trusted-host", "pypi.python.org", "--trusted-host", "files.pythonhosted.org"])
-        self.virtual_env.pip(pip_args)
-        self.virtual_env.run(["python", "-m", self.package_manager_name, self.get_install_argument(), *package_manager_args])
-        return 0
 
-    @staticmethod
-    def instantiate_os_specific_venv(venv_dir: Path) -> VirtualEnvironment:
-        if sys.platform.startswith("win32"):
-            return WindowsVirtualEnvironment(venv_dir)
-        elif sys.platform.startswith("linux") or sys.platform.startswith("darwin"):
-            return UnixVirtualEnvironment(venv_dir)
-        else:
-            raise UserNotificationException(f"Unsupported operating system: {sys.platform}")
+        # Use the bootstrap environment's package manager to install dependencies
+        # The package manager will create the .venv if it doesn't exist
+        logger.info(f"Using bootstrap environment at {self.bootstrap_env.venv_dir}")
+        self.bootstrap_env.virtual_env.run(self._get_install_command(), capture_output=True, cwd=self.root_dir)
+
+        # Write Python version marker after package manager creates/updates venv
+        if self.venv_dir.exists():
+            current_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+            self._write_python_version_marker(current_version)
+
+        # Configure pip if needed (after venv is created by package manager)
+        if pypi_source and self.venv_dir.exists():
+            self.virtual_env.pip_configure(index_url=pypi_source.url, verify_ssl=True)
+
+        return 0
 
     def get_name(self) -> str:
         return "create-virtual-environment"
@@ -435,11 +680,20 @@ class CreateVirtualEnvironment(Runnable):
             ".bootstrap/bootstrap.py",
             "bootstrap.ps1",
             "bootstrap.py",
+            str(self.bootstrap_env.marker_file),
         ]
         return [self.root_dir / file for file in venv_relevant_files]
 
     def get_outputs(self) -> List[Path]:
-        return []
+        """Return the Scripts/bin directories for both bootstrap and project environments.
+
+        These paths are recorded in the .deps.json file, allowing other tools to discover
+        the package manager location (bootstrap env) and project tools (project env).
+        """
+        return [
+            self.virtual_env.scripts_path(),
+            self.bootstrap_env.virtual_env.scripts_path(),
+        ]
 
 
 def print_environment_info() -> None:
@@ -453,11 +707,21 @@ def print_environment_info() -> None:
 
 def main() -> int:
     try:
-        # print_environment_info()
-        creator = CreateVirtualEnvironment(Path.cwd())
-        Executor(creator.venv_dir).execute(creator)
-    except UserNotificationException as e:
-        logger.error(e)
+        project_dir = Path.cwd()
+        config = BootstrapConfig.from_json_file(project_dir / "bootstrap.json")
+
+        # Step 1: Create the bootstrap environment (shared cache)
+        bootstrap_env = CreateBootstrapEnvironment(config, project_dir)
+        bootstrap_executor = Executor(bootstrap_env.bootstrap_env_dir)
+        bootstrap_executor.execute(bootstrap_env)
+
+        # Step 2: Create the project virtual environment using the bootstrap env
+        project_venv = CreateVirtualEnvironment(project_dir, bootstrap_env)
+        project_executor = Executor(project_venv.venv_dir)
+        project_executor.execute(project_venv)
+
+    except UserNotificationException as exc:
+        logger.error(exc)
         return 1
     return 0
 

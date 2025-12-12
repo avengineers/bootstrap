@@ -33,7 +33,7 @@ jobs:
                   USER_PATH_FIRST: 1
               run: |
                   .\bootstrap.ps1
-                  .\.venv\Scripts\poetry run pytest
+                  .\.venv\Scripts\pytest
               shell: pwsh
     test_powershell:
         name: Unit and Integration Tests (Powershell 5.x)
@@ -55,4 +55,4 @@ jobs:
                   USER_PATH_FIRST: 1
               run: |
                   .\bootstrap.ps1
-                  .\.venv\Scripts\poetry run pytest
+                  .\.venv\Scripts\pytest

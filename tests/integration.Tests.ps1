@@ -5,16 +5,16 @@ Describe "Bootstrap Integration Tests" {
         $scriptPath = Join-Path -Path $PSScriptRoot -ChildPath "\..\bootstrap.ps1"
         Push-Location $testDataPath
         Remove-Item -Path '.venv' -Recurse -Force -ErrorAction SilentlyContinue
-        Remove-Item -Path 'Pipfile.lock' -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path 'poetry.lock' -Recurse -Force -ErrorAction SilentlyContinue
 
         # Act
         & "$scriptPath"
 
         # Assert
-        'Pipfile.lock' | Should -Exist
+        'poetry.lock' | Should -Exist
         ".venv\create-virtual-environment.deps.json" | Should -Exist
         ".venv\Scripts\python.exe" | Should -Exist
-        ".venv\Scripts\pip$_.exe" | Should -Exist
+        ".venv\Scripts\pip.exe" | Should -Exist
         ".venv\.gitignore" | Should -Exist
 
         Pop-Location

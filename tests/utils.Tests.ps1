@@ -3,7 +3,8 @@ BeforeAll {
     $sut = (Split-Path -Leaf $PSCommandPath).Replace('.Tests.ps1', '.ps1')
     # Inhibit execution of Main function of SUT
     Set-Alias Main out-null
-    . ".\$sut"
+    $sutPath = Join-Path -Path $PSScriptRoot -ChildPath "..\$sut"
+    . $sutPath
     Remove-Item Alias:Main
 }
 
