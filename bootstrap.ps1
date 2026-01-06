@@ -17,7 +17,7 @@ function Get-BootstrapConfig {
             autostash_on_conflict = "true"
             use_lessmsi           = "true"
             scoop_repo            = "https://github.com/avengineers/Scoop.git"
-            scoop_branch          = "develop"
+            scoop_branch          = "master"
         }
     }
 
@@ -30,7 +30,7 @@ function Get-BootstrapConfig {
         }
         else {
             $custom_config.scoop_config = @{}
-        } 
+        }
     }
 
     # Merge the default and custom configuration
