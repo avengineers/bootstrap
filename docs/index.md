@@ -1,4 +1,4 @@
-# Some thoughts about Bootstrap
+# Bootstrap
 
 ## Requirements
 
