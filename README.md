@@ -40,8 +40,8 @@ That's it! You're now ready to start developing your Python project using this r
 
   General Scoop settings:
   - scoop_installer = <https://raw.githubusercontent.com/xxthunder/ScoopInstall/v1.1.0/install.ps1>
-  - scoop_default_bucket_base_url = <https://raw.githubusercontent.com/ScoopInstaller/Main/master/bucket>
-  - scoop_python_bucket_base_url = <https://raw.githubusercontent.com/ScoopInstaller/Versions/master/bucket>
+  - scoop_default_bucket_base_url = *(empty by default)* — if set, dependencies (7zip, lessmsi, etc.) are installed from this raw URL instead of the Scoop main bucket
+  - scoop_python_bucket_base_url = *(empty by default)* — if set, Python is installed from this raw URL instead of the Scoop versions bucket
 
   Scoop configuration:
   - autostash_on_conflict = true

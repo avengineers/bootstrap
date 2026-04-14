@@ -10,8 +10,8 @@ function Get-BootstrapConfig {
         python_package_manager        = "poetry"
         scoop_installer               = "https://raw.githubusercontent.com/avengineers/ScoopInstall/refs/tags/v1.1.0/install.ps1"
         scoop_installer_with_repo_arg = $false
-        scoop_default_bucket_base_url = "https://raw.githubusercontent.com/ScoopInstaller/Main/master/bucket"
-        scoop_python_bucket_base_url  = "https://raw.githubusercontent.com/ScoopInstaller/Versions/master/bucket"
+        scoop_default_bucket_base_url = ""
+        scoop_python_bucket_base_url  = ""
         scoop_ignore_scoopfile        = $false
         scoop_config                  = @{
             autostash_on_conflict = "true"
@@ -76,18 +76,24 @@ function Install-Scoop {
         Invoke-CommandLine ("scoop config " + $item.Key + " " + $item.Value) -Silent $true -PrintCommand $false
     }
 
-    # Install any installer dependencies
+    # Install scoop dependencies.
     # CAUTION: the order is important and shall not be changed!
     # - 7zip needs lessmsi for installation
     # - innounp needs 7zip
-    $manifests = @(
-        "lessmsi.json",
-        "7zip.json",
-        "innounp.json",
-        "dark.json"
-    )
-    $manifests | ForEach-Object {
-        Invoke-CommandLine "scoop install $($config.scoop_default_bucket_base_url)/$_" -Silent $true -PrintCommand $false
+    if ($config.scoop_default_bucket_base_url) {
+        # Legacy mode: install from raw URL (for repos that override this config)
+        $manifests = @("lessmsi.json", "7zip.json", "innounp.json", "dark.json")
+        $manifests | ForEach-Object {
+            Invoke-CommandLine "scoop install $($config.scoop_default_bucket_base_url)/$_" -Silent $true -PrintCommand $false
+        }
+    }
+    else {
+        # Default: add main bucket and install by name (avoids post_install script issues)
+        Invoke-CommandLine "scoop bucket add main" -Silent $false -PrintCommand $false -StopAtError $false
+        $dependencies = @("lessmsi", "7zip", "innounp", "dark")
+        $dependencies | ForEach-Object {
+            Invoke-CommandLine "scoop install $_" -Silent $true -PrintCommand $false
+        }
     }
 
     # Import scoopfile.json
@@ -121,8 +127,15 @@ function Install-Python {
     $pythonPath = (Get-Command $python -ErrorAction SilentlyContinue).Source
     if ($null -eq $pythonPath) {
         Write-Output "$python not found. Try to install $python via scoop ..."
-        # Install python
-        Invoke-CommandLine "scoop install $($config.scoop_python_bucket_base_url)/$python.json"
+        if ($config.scoop_python_bucket_base_url) {
+            # Legacy mode: install from raw URL
+            Invoke-CommandLine "scoop install $($config.scoop_python_bucket_base_url)/$python.json"
+        }
+        else {
+            # Default: add versions bucket and install by name
+            Invoke-CommandLine "scoop bucket add versions" -Silent $false -PrintCommand $false -StopAtError $false
+            Invoke-CommandLine "scoop install $python"
+        }
 
         Initialize-EnvPath
     }

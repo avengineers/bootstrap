@@ -109,7 +109,7 @@ Describe "Install-Scoop" {
 
         Install-Scoop
 
-        Should -Invoke -CommandName Invoke-CommandLine -Exactly 8
+        Should -Invoke -CommandName Invoke-CommandLine -Exactly 9
         Should -Invoke -CommandName Invoke-CommandLine -Exactly 4 -ParameterFilter { $CommandLine -like "scoop config *" }
         Should -Invoke -CommandName Invoke-CommandLine -Exactly 1 -ParameterFilter { $CommandLine -eq "scoop config use_lessmsi true" }
     }
@@ -120,7 +120,21 @@ Describe "Install-Scoop" {
 
         Install-Scoop
 
+        Should -Invoke -CommandName Invoke-CommandLine -Exactly 9
+        Should -Invoke -CommandName Invoke-CommandLine -Exactly 1 -ParameterFilter { $CommandLine -eq "scoop bucket add main" }
+        Should -Invoke -CommandName Invoke-CommandLine -Exactly 4 -ParameterFilter { $CommandLine -match "^scoop install (lessmsi|7zip|innounp|dark)$" }
+    }
+
+    It "shall install scoop dependencies from URL when scoop_default_bucket_base_url is configured" {
+        Mock -CommandName Get-Command -MockWith { $true }
+        Mock -CommandName Test-Path -MockWith { $false }
+
+        $config.scoop_default_bucket_base_url = "https://raw.githubusercontent.com/ScoopInstaller/Main/master/bucket"
+        Install-Scoop
+        $config.scoop_default_bucket_base_url = ""
+
         Should -Invoke -CommandName Invoke-CommandLine -Exactly 8
+        Should -Invoke -CommandName Invoke-CommandLine -Exactly 0 -ParameterFilter { $CommandLine -eq "scoop bucket add main" }
         Should -Invoke -CommandName Invoke-CommandLine -Exactly 4 -ParameterFilter { $CommandLine -like "scoop install */*.json" }
     }
 
@@ -130,7 +144,7 @@ Describe "Install-Scoop" {
 
         Install-Scoop
 
-        Should -Invoke -CommandName Invoke-CommandLine -Exactly 8
+        Should -Invoke -CommandName Invoke-CommandLine -Exactly 9
         Should -Invoke -CommandName Import-ScoopFile -Exactly 1 -ParameterFilter { $ScoopFilePath -eq "scoopfile.json" }
     }
 
@@ -142,9 +156,7 @@ Describe "Install-Scoop" {
         Install-Scoop
         $config.scoop_ignore_scoopfile = $false
 
-        Should -Invoke -CommandName Invoke-CommandLine -Exactly 8
-        Should -Invoke -CommandName Invoke-CommandLine -Exactly 0 -ParameterFilter { $CommandLine -eq "scoop update" }
-        Should -Invoke -CommandName Invoke-CommandLine -Exactly 0 -ParameterFilter { $CommandLine -eq "scoop import scoopfile.json --reset" }
+        Should -Invoke -CommandName Invoke-CommandLine -Exactly 9
     }
 }
 
@@ -198,9 +210,22 @@ Describe "Install-Python" {
         
         Install-Python
         
-        Should -Invoke -CommandName Invoke-CommandLine -Exactly 1
-        Should -Invoke -CommandName Invoke-CommandLine -Exactly 1 -ParameterFilter { $CommandLine -like "scoop install */python311.json" }
+        Should -Invoke -CommandName Invoke-CommandLine -Exactly 2
+        Should -Invoke -CommandName Invoke-CommandLine -Exactly 1 -ParameterFilter { $CommandLine -eq "scoop bucket add versions" }
+        Should -Invoke -CommandName Invoke-CommandLine -Exactly 1 -ParameterFilter { $CommandLine -eq "scoop install python311" }
         Should -Invoke -CommandName Write-Output -Exactly 1 -ParameterFilter { $InputObject -eq "python311 not found. Try to install python311 via scoop ..." }
+    }
+
+    It "shall install python from URL when scoop_python_bucket_base_url is configured" {
+        Mock -CommandName Get-Command -MockWith { $null }
+
+        $config.scoop_python_bucket_base_url = "https://raw.githubusercontent.com/ScoopInstaller/Versions/master/bucket"
+        Install-Python
+        $config.scoop_python_bucket_base_url = ""
+
+        Should -Invoke -CommandName Invoke-CommandLine -Exactly 1
+        Should -Invoke -CommandName Invoke-CommandLine -Exactly 0 -ParameterFilter { $CommandLine -eq "scoop bucket add versions" }
+        Should -Invoke -CommandName Invoke-CommandLine -Exactly 1 -ParameterFilter { $CommandLine -like "scoop install */python311.json" }
     }
     
     It "shall not install python if python is available" {
