@@ -6,12 +6,9 @@
 # Load configuration from bootstrap.json or use default values
 function Get-BootstrapConfig {
     $bootstrapConfig = @{
-        python_version                = "3.11"
         python_package_manager        = "poetry"
         scoop_installer               = "https://raw.githubusercontent.com/avengineers/ScoopInstall/refs/tags/v1.1.0/install.ps1"
         scoop_installer_with_repo_arg = $false
-        scoop_default_bucket_base_url = ""
-        scoop_python_bucket_base_url  = ""
         scoop_ignore_scoopfile        = $false
         scoop_config                  = @{
             autostash_on_conflict = "true"
@@ -53,6 +50,40 @@ function Get-BootstrapConfig {
     return $bootstrapConfig
 }
 
+function Get-PythonFromScoopManifest {
+    param(
+        [Parameter(Mandatory = $true)]
+        [Hashtable]$Config
+    )
+
+    $result = [PSCustomObject]@{
+        Name    = $null
+        Version = $null
+    }
+
+    if ($Config.scoop_manifest -and $Config.scoop_manifest.apps) {
+        $pythonApps = @($Config.scoop_manifest.apps | Where-Object { $_.Name -match '^python\d' })
+        if ($pythonApps.Count -gt 1) {
+            Write-Warning "Multiple Python apps found in scoop_manifest: $($pythonApps.Name -join ', '). Using the first one: '$($pythonApps[0].Name)'."
+        }
+        if ($pythonApps.Count -ge 1) {
+            $result.Name = $pythonApps[0].Name
+            # Extract python version: prefer explicit Version key, otherwise derive from app name
+            if ($pythonApps[0].Version) {
+                $result.Version = $pythonApps[0].Version
+            }
+            elseif ($pythonApps[0].Name -match '^python(\d)(\d+)$') {
+                $result.Version = "$($Matches[1]).$($Matches[2])"
+            }
+            elseif ($pythonApps[0].Name -match '^python(\d)$') {
+                $result.Version = $Matches[1]
+            }
+        }
+    }
+
+    return $result
+}
+
 function Install-Scoop {
     if (-Not (Get-Command 'scoop' -ErrorAction SilentlyContinue)) {
         $tempDir = [System.IO.Path]::GetTempPath()
@@ -76,25 +107,21 @@ function Install-Scoop {
         Invoke-CommandLine ("scoop config " + $item.Key + " " + $item.Value) -Silent $true -PrintCommand $false
     }
 
-    # Install scoop dependencies.
-    # CAUTION: the order is important and shall not be changed!
-    # - 7zip needs lessmsi for installation
-    # - innounp needs 7zip
-    if ($config.scoop_default_bucket_base_url) {
-        # Legacy mode: install from raw URL (for repos that override this config)
-        $manifests = @("lessmsi.json", "7zip.json", "innounp.json", "dark.json")
-        $manifests | ForEach-Object {
-            Invoke-CommandLine "scoop install $($config.scoop_default_bucket_base_url)/$_" -Silent $true -PrintCommand $false
-        }
+    # Install scoop dependencies from scoop_manifest (mandatory in bootstrap.json).
+    # CAUTION: the order of apps in scoop_manifest is important and shall not be changed!
+    # E.g. 7zip needs lessmsi, innounp needs 7zip.
+    if (-Not $config.scoop_manifest) {
+        Write-Error "scoop_manifest is required in bootstrap.json. Please define your scoop dependencies there."
     }
-    else {
-        # Default: add main bucket and install by name (avoids post_install script issues)
-        Invoke-CommandLine "scoop bucket add main" -Silent $false -PrintCommand $false -StopAtError $false
-        $dependencies = @("lessmsi", "7zip", "innounp", "dark")
-        $dependencies | ForEach-Object {
-            Invoke-CommandLine "scoop install $_" -Silent $true -PrintCommand $false
-        }
+    $tempScoopFile = Join-Path ([System.IO.Path]::GetTempPath()) "bootstrap-scoopfile.json"
+    try {
+        $config.scoop_manifest | ConvertTo-Json -Depth 3 | Set-Content -Path $tempScoopFile -Encoding UTF8
+        Import-ScoopFile -ScoopFilePath $tempScoopFile
     }
+    finally {
+        Remove-Item -Path $tempScoopFile -Force -ErrorAction SilentlyContinue
+    }
+    Initialize-EnvPath
 
     # Import scoopfile.json
     if ((-Not $config.scoop_ignore_scoopfile) -and (Test-Path -Path 'scoopfile.json')) {
@@ -108,6 +135,10 @@ function Install-Scoop {
 
 # Prepare virtual Python environment
 function Install-PythonEnvironment {
+    if (-Not $python) {
+        Write-Output "No Python app found in scoop_manifest. Skipping Python environment setup."
+        return
+    }
     if ((Test-Path -Path 'pyproject.toml') -or (Test-Path -Path 'Pipfile')) {
         if ($clean) {
             # Start with a fresh virtual environment
@@ -115,56 +146,20 @@ function Install-PythonEnvironment {
         }
         New-Directory '.venv'
         $bootstrapPy = Join-Path $PSScriptRoot "bootstrap.py"
-        Invoke-CommandLine "$python $bootstrapPy"
+        $bootstrapArgs = "$python $bootstrapPy"
+        if ($pythonVersion) {
+            $bootstrapArgs += " --python-version $pythonVersion"
+        }
+        Invoke-CommandLine $bootstrapArgs
     }
     else {
         Write-Output "No Python config file found, skipping Python setup."
     }
 }
 
-function Install-Python {
-    # Check if python is installed
-    $pythonPath = (Get-Command $python -ErrorAction SilentlyContinue).Source
-    if ($null -eq $pythonPath) {
-        Write-Output "$python not found. Try to install $python via scoop ..."
-        if ($config.scoop_python_bucket_base_url) {
-            # Legacy mode: install from raw URL
-            Invoke-CommandLine "scoop install $($config.scoop_python_bucket_base_url)/$python.json"
-        }
-        else {
-            # Default: add versions bucket and install by name
-            Invoke-CommandLine "scoop bucket add versions" -Silent $false -PrintCommand $false -StopAtError $false
-            Invoke-CommandLine "scoop install $python"
-        }
-
-        Initialize-EnvPath
-    }
-    else {
-        Write-Output "$python found in $pythonPath, skipping installation."
-    }
-}
-
-function Get-PythonExecutableName {
-    param (
-        [string]$pythonVersion
-    )
-
-    # Split the version and handle varying segment lengths
-    $version_parts = $pythonVersion.Split(".")
-    $major_minor_version = $version_parts[0]  # Always include the major version
-
-    # Append the minor version if it exists
-    if ($version_parts.Count -ge 2) {
-        $major_minor_version += $version_parts[1]
-    }
-
-    return "python" + $major_minor_version
-}
-
 # Main function needed for testing (will be mocked)
 function Main {
     Install-Scoop
-    Install-Python
     Install-PythonEnvironment
 }
 
@@ -177,16 +172,24 @@ $InformationPreference = "Continue"
 # Stop on first error
 $ErrorActionPreference = "Stop"
 
-# Load functions from utils.ps1
+# Load functions from utils.ps1 and scoop-utils.ps1
 . "$PSScriptRoot\utils.ps1"
+. "$PSScriptRoot\scoop-utils.ps1"
 
 # Load config
 $config = Get-BootstrapConfig
 
-# python executable name
-$python = Get-PythonExecutableName -pythonVersion $config.python_version
+# Determine python executable name and version from scoop_manifest apps.
+$pythonInfo = Get-PythonFromScoopManifest -Config $config
+$python = $pythonInfo.Name
+$pythonVersion = $pythonInfo.Version
 
-Write-Output "Python executable: $python"
+if ($python) {
+    Write-Output "Python executable: $python"
+}
+if ($pythonVersion) {
+    Write-Output "Python version: $pythonVersion"
+}
 
 Main
 

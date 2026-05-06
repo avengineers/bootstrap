@@ -1,4 +1,41 @@
 {
-    "python_version": "3.11",
-    "python_package_manager": "poetry>=2.1.0"
+    "python_package_manager": "poetry>=2.1.0",
+    "scoop_manifest": {
+        "buckets": [
+            {
+                "Name": "main",
+                "Source": "https://github.com/ScoopInstaller/Main"
+            },
+            {
+                "Name": "versions",
+                "Source": "https://github.com/ScoopInstaller/Versions"
+            }
+        ],
+        "apps": [
+            {
+                "Name": "lessmsi",
+                "Source": "main",
+                "Version": "2.12.5"
+            },
+            {
+                "Name": "7zip",
+                "Source": "main",
+                "Version": "26.00"
+            },
+            {
+                "Name": "innounp",
+                "Source": "main",
+                "Version": "2.67.4"
+            },
+            {
+                "Name": "dark",
+                "Source": "main",
+                "Version": "3.14.1"
+            },
+            {
+                "Name": "python311",
+                "Source": "versions"
+            }
+        ]
+    }
 }
