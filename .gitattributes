@@ -1,0 +1,2 @@
+# Prevent UTF-8 BOM in PowerShell scripts (breaks Invoke-Expression piping in PS 5.1)
+*.ps1 text working-tree-encoding=UTF-8

@@ -38,13 +38,21 @@ function Invoke-CommandLine {
         Write-Output "Executing: $CommandLine"
     }
     $global:LASTEXITCODE = 0
+    # Redirect stderr to stdout and suppress PowerShell errors during execution.
+    # Native commands (git, python, scoop) write to stderr for non-error output
+    # (progress, warnings, logging). Without this, those writes become terminating
+    # errors when the caller sets $ErrorActionPreference = 'Stop'.
+    # Actual failures are detected via $LASTEXITCODE below.
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
     if ($Silent) {
-        # Omit information stream (6) and stdout (1)
-        Invoke-Expression $CommandLine 6>&1 | Out-Null
+        # Omit information stream (6), stderr (2) and stdout (1)
+        Invoke-Expression $CommandLine 2>&1 6>&1 | Out-Null
     }
     else {
-        Invoke-Expression $CommandLine
+        Invoke-Expression $CommandLine 2>&1
     }
+    $ErrorActionPreference = $previousErrorActionPreference
     if ($global:LASTEXITCODE -ne 0) {
         if ($StopAtError) {
             Write-Error "Command line call `"$CommandLine`" failed with exit code $global:LASTEXITCODE"
@@ -52,74 +60,6 @@ function Invoke-CommandLine {
         else {
             Write-Output "Command line call `"$CommandLine`" failed with exit code $global:LASTEXITCODE, continuing ..."
         }
-    }
-}
-
-function Convert-ScoopFileJsonToHashTable {
-    param (
-        [Parameter(Mandatory = $true)]
-        [string]$ScoopFileJson
-    )
-
-    $return = @{
-        "buckets" = @();
-        "apps"    = @() 
-    }
-
-    $scoopFileData = ConvertFrom-Json -InputObject $ScoopFileJson
-
-    if ($scoopFileData.buckets -is [System.Collections.IEnumerable]) {
-        foreach ($bucket in $scoopFileData.buckets) {
-            $return.buckets += @{
-                "Name"   = $bucket.Name
-                "Source" = $bucket.Source
-            }
-        }
-    }
-
-    if ($scoopFileData.apps -is [System.Collections.IEnumerable]) {
-        foreach ($app in $scoopFileData.apps) {
-            $return.apps += @{
-                "Name"       = $app.Name
-                "Source"     = $app.Source
-                "Version"    = $app.Version
-                "Identifier" = if ($app.Version) { "$($app.Source)/$($app.Name)@$($app.Version)" } else { "$($app.Source)/$($app.Name)" }
-            }
-        }
-    }
-
-    return $return
-}
-
-function Import-ScoopFile {
-    param (
-        [Parameter(Mandatory = $true)]
-        [string]$ScoopFilePath
-    )
-
-    $scoopFileData = Convert-ScoopFileJsonToHashTable -ScoopFileJson (Get-Content -Path $ScoopFilePath -Raw)
-
-    # Add the buckets
-    $scoopFileData.buckets | ForEach-Object {
-        $bucket = $_
-        Write-Output "Processing bucket: $($bucket.Name)"
-        # We try to add each bucket, even if it already exists (we ignore any error here)
-        Invoke-CommandLine "scoop bucket add $($bucket.Name) $($bucket.Source)" -StopAtError $false
-    }
-
-    # Update buckets only if there are any buckets or apps to process
-    if ($scoopFileData.buckets.Count -gt 0 -or $scoopFileData.apps.Count -gt 0) {
-        Invoke-CommandLine "scoop update"
-    }
-
-    # Install the apps
-    $scoopFileData.apps | ForEach-Object {
-        $app = $_
-        Write-Output "Processing app: $($app.Name)"
-        Invoke-CommandLine "scoop install $($app.Identifier)"
-
-        # TODO: Replace this by some scoop env mechanism in the .venv directory
-        Invoke-CommandLine "scoop reset $($app.Identifier)"
     }
 }
 

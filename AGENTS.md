@@ -200,8 +200,8 @@ Describe "Get-BootstrapConfig" {
 
 #### 6. Scoop Integration
 
-- **Bucket URLs**: Use raw URLs for bucket manifests
-- **Installation order matters**: Dependencies like `7zip` → `innounp` → `dark`
+- **`scoop_manifest` is mandatory**: All scoop buckets and apps must be defined in `bootstrap.json` under `scoop_manifest`
+- **Installation order matters**: The order of apps in `scoop_manifest` is significant (e.g. `lessmsi` → `7zip` → `innounp` → `dark`)
 - **Silent installations**: Use `-Silent $true -PrintCommand $false` for dependencies
 - **Environment refresh**: Call `Initialize-EnvPath` after installs
 

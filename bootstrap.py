@@ -1,3 +1,4 @@
+import argparse
 import configparser
 import ensurepip
 import hashlib
@@ -53,7 +54,6 @@ class BootstrapConfig:
         cache_dir = Path(cache_dir_str).expanduser() if cache_dir_str else None
 
         return cls(
-            python_version=data.get("python_version", ""),
             package_manager=data.get("python_package_manager", DEFAULT_PACKAGE_MANAGER),
             package_manager_args=data.get("python_package_manager_args", []),
             bootstrap_packages=bootstrap_packages,
@@ -705,10 +705,23 @@ def print_environment_info() -> None:
     logger.info(str_bar)
 
 
+def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(description="Bootstrap Python development environment.")
+    parser.add_argument(
+        "--python-version",
+        default="",
+        help="Python version to use for the bootstrap environment (e.g., '3.11' or '3.11.9').",
+    )
+    return parser.parse_args(argv)
+
+
 def main() -> int:
     try:
+        args = parse_args()
         project_dir = Path.cwd()
         config = BootstrapConfig.from_json_file(project_dir / "bootstrap.json")
+        config.python_version = args.python_version
 
         # Step 1: Create the bootstrap environment (shared cache)
         bootstrap_env = CreateBootstrapEnvironment(config, project_dir)

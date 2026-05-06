@@ -32,6 +32,7 @@ jobs:
                   # Workaround to force usage of scoop apps installed in USERPROFILE.
                   USER_PATH_FIRST: 1
               run: |
+                  Copy-Item tests/data/python3.11/bootstrap.json .
                   .\bootstrap.ps1
                   .\.venv\Scripts\pytest
               shell: pwsh
@@ -54,5 +55,6 @@ jobs:
                   # Workaround to force usage of scoop apps installed in USERPROFILE.
                   USER_PATH_FIRST: 1
               run: |
+                  Copy-Item tests/data/python3.11/bootstrap.json .
                   .\bootstrap.ps1
                   .\.venv\Scripts\pytest

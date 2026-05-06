@@ -13,6 +13,7 @@ from bootstrap import (
     CreateVirtualEnvironment,
     UserNotificationException,
     extract_package_manager_name,
+    parse_args,
 )
 
 
@@ -32,12 +33,16 @@ def test_bootstrap_config_defaults():
 def test_bootstrap_config_from_json_file(tmp_path: Path):
     # Arrange
     config_data = {
-        "python_version": "3.11.4",
         "python_package_manager": "poetry==2.1.0",
         "python_package_manager_args": ["--no-dev"],
         "bootstrap_packages": ["pip-system-certs==4.0.0", "wrapt==1.14.0"],
         "bootstrap_cache_dir": "~/.my-bootstrap-cache",
         "venv_install_command": "poetry install --no-interaction",
+        "scoop_manifest": {
+            "apps": [
+                {"Name": "python311", "Source": "versions"},
+            ]
+        },
     }
     config_file = tmp_path / "bootstrap.json"
     config_file.write_text(json.dumps(config_data))
@@ -46,12 +51,30 @@ def test_bootstrap_config_from_json_file(tmp_path: Path):
     config = BootstrapConfig.from_json_file(config_file)
 
     # Assert
-    assert config.python_version == "3.11.4"
+    assert config.python_version == ""
     assert config.package_manager == "poetry==2.1.0"
     assert config.package_manager_args == ["--no-dev"]
     assert config.bootstrap_packages == ["pip-system-certs==4.0.0", "wrapt==1.14.0"]
     assert config.bootstrap_cache_dir == Path("~/.my-bootstrap-cache").expanduser()
     assert config.venv_install_command == "poetry install --no-interaction"
+
+
+@pytest.mark.parametrize(
+    ("python_version",),
+    [
+        ("3.11",),
+        ("3.10.5",),
+        ("3.12",),
+        ("",),
+    ],
+)
+def test_parse_args_python_version(python_version: str):
+    if python_version:
+        args = parse_args(["--python-version", python_version])
+        assert args.python_version == python_version
+    else:
+        args = parse_args([])
+        assert args.python_version == ""
 
 
 def test_bootstrap_config_from_missing_file_returns_defaults(tmp_path: Path):

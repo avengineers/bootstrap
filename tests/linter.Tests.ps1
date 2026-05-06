@@ -14,3 +14,13 @@ Describe 'Analysis of file <_> against Script Analyzer Rules' -ForEach $toBeAnal
         $analysisResult | Should -BeNullOrEmpty
     }
 }
+
+Describe 'UTF-8 BOM check for file <_>' -ForEach $toBeAnalysed {
+    It "Shall not contain a UTF-8 BOM" {
+        $bytes = [System.IO.File]::ReadAllBytes($_)
+        if ($bytes.Length -ge 3) {
+            $hasBom = ($bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF)
+            $hasBom | Should -BeFalse -Because "UTF-8 BOM breaks Invoke-Expression piping on PowerShell 5.1"
+        }
+    }
+}

@@ -35,33 +35,49 @@ That's it! You're now ready to start developing your Python project using this r
 - **Default settings**: Without adjusting any settings in the files, the following options are used by default for the installation process:
 
   Python settings:
-  - python_version = 3.11
   - python_package_manager = poetry
 
   General Scoop settings:
   - scoop_installer = <https://raw.githubusercontent.com/xxthunder/ScoopInstall/v1.1.0/install.ps1>
-  - scoop_default_bucket_base_url = *(empty by default)* — if set, dependencies (7zip, lessmsi, etc.) are installed from this raw URL instead of the Scoop main bucket
-  - scoop_python_bucket_base_url = *(empty by default)* — if set, Python is installed from this raw URL instead of the Scoop versions bucket
+  - scoop_manifest = *(mandatory)* — defines scoop buckets and apps to install, including Python (see example below)
 
   Scoop configuration:
   - autostash_on_conflict = true
-  - use_lessmsi = true
+  - use_lessmsi = true *(requires lessmsi to be listed in scoop_manifest apps)*
   - scoop_repo = <https://github.com/xxthunder/Scoop.git>
   - scoop_branch = develop
 
-- **How to customize the configuration**: If you want to configure your own settings, you have to create a `bootstrap.json` file. The values entered there overwrite the corresponding standard settings. See the following example:
+- **How to customize the configuration**: If you want to configure your own settings, you have to create a `bootstrap.json` file. The values entered there overwrite the corresponding standard settings. The `scoop_manifest` key is **mandatory** and must define the scoop buckets and apps to install. Python must be listed as an app (e.g. `python312`) — it is detected automatically by name. See the following example:
 
   ```json
   {
-    "python_version": "3.12",
     "scoop_ignore_scoopfile": true,
+    "scoop_manifest": {
+      "buckets": [
+        {
+          "Name": "main",
+          "Source": "https://github.com/ScoopInstaller/Main"
+        },
+        {
+          "Name": "versions",
+          "Source": "https://github.com/ScoopInstaller/Versions"
+        }
+      ],
+      "apps": [
+        { "Name": "lessmsi", "Source": "main", "Version": "2.12.5" },
+        { "Name": "7zip", "Source": "main", "Version": "26.00" },
+        { "Name": "innounp", "Source": "main", "Version": "2.67.4" },
+        { "Name": "dark", "Source": "main", "Version": "3.14.1" },
+        { "Name": "python312", "Source": "versions" }
+      ]
+    },
     "scoop_config": {
       "autostash_on_conflict": false
     }
   }
   ```
 
-  This file will overwrite the corresponding entries in the default settings. A newer python version is now being used, scoopfile is ignored and autostash now applies when a conflict occurs. All the other entries remain at their default value.
+  This file will overwrite the corresponding entries in the default settings. Scoopfile is ignored and autostash now applies when a conflict occurs. All the other entries remain at their default value.
 
 - **`scoopfile.json`**: See the following example. Refer to the [official scoop documentation](https://github.com/ScoopInstaller/Scoop/wiki) for more details.
 
@@ -93,9 +109,8 @@ The entire working logic of the installation process is divided into several scr
 
 - **`bootstrap.ps1`**: This PowerShell script is designed to be run from the command line and does not require any arguments. It is responsible for setting up the project environment by performing the following steps:
     1. Load configuration. If no `bootstrap.json` file is provided, default settings will be used.
-    2. Install Scoop.
-    3. Install Python using Scoop.
-    4. When there is a `pyproject.toml` file, call `bootstrap.py` to create a virtual environment.
+    2. Install Scoop and all dependencies defined in `scoop_manifest` (including Python).
+    3. When there is a `pyproject.toml` file, call `bootstrap.py` to create a virtual environment.
 
 - **`bootstrap.py`**: This Python script provides a set of classes and methods for managing a Python environment. It includes functionality for creating a new virtual environment, configuring pip settings within it, and executing arbitrary commands inside it. There is also a mechanism to check if users provide new configuration settings, so that when the script is run again, all the functionality is only triggered if something has changed.
 
