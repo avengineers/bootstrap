@@ -35,7 +35,7 @@ That's it! You're now ready to start developing your Python project using this r
 - **Default settings**: Without adjusting any settings in the files, the following options are used by default for the installation process:
 
   Python settings:
-  - python_version = 3.11
+  - python_version = 3.11 — a full version such as `3.13.17` sets a minimum patch version. Bootstrap installs Python only if it is missing and never updates an existing installation, so it stops if the Python it finds is older (run `scoop update python313` to fix it)
   - python_package_manager = poetry
 
   General Scoop settings:

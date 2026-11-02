@@ -25,6 +25,14 @@ DEFAULT_PACKAGE_MANAGER = "poetry>=2.1.0"
 DEFAULT_BOOTSTRAP_PACKAGES = ["pip-system-certs>=4.0,<5.0"]
 BOOTSTRAP_COMPLETE_MARKER = ".bootstrap-complete"
 VENV_PYTHON_VERSION_MARKER = ".python_version"
+# pip and certifi releases before these trust the compromised emSign CA (GHSA-6q48-6c7w-9gw2)
+MIN_PIP_VERSION = "26.2.2"
+# sha256 of pip-26.2.2-py3-none-any.whl on PyPI; must change together with MIN_PIP_VERSION
+PIP_WHEEL_SHA256 = "fd7f4dfa8190e014013b9f08f3e973f4e4c26ffd179a204895533a7254813a70"
+CERTIFI_REQUIREMENT = "certifi>=2026.10.19"
+# pip versions before this do not use the system certificate store
+PIP_TRUSTSTORE_VERSION = "24.2"
+PIP_REQUIREMENTS_FILE = "pip-requirements.txt"
 
 
 @dataclass
@@ -77,6 +85,11 @@ class BootstrapConfig:
             f"python={python_major_minor}",
             f"manager={self.package_manager}",
             f"packages={sorted(self.bootstrap_packages)}",
+            # A full version (e.g. 3.13.17), the pip floor and the certifi floor give a new environment
+            # instead of rebuilding one that other projects or bootstrap releases still use.
+            f"python_version={self.python_version}",
+            f"min_pip={MIN_PIP_VERSION}",
+            f"certifi={CERTIFI_REQUIREMENT}",
         ]
         content = "|".join(str(component) for component in components)
         return hashlib.sha256(content.encode()).hexdigest()[:12]
@@ -501,25 +514,13 @@ class CreateBootstrapEnvironment(Runnable):
             if pypi_source:
                 bootstrap_venv.pip_configure(index_url=pypi_source.url, verify_ssl=True)
 
-            # Build pip install arguments
-            packages_to_install = [self.config.package_manager, *self.config.bootstrap_packages]
-            pip_args = ["install", *packages_to_install]
+            # The bundled pip may trust compromised CAs, so replace it before the first package install
+            if Version(ensurepip.version()) < Version(MIN_PIP_VERSION):
+                self._upgrade_pip(bootstrap_venv, pypi_source)
 
-            # Handle SSL certificates for older pip versions
-            if Version(ensurepip.version()) < Version("24.2"):
-                if pypi_source and (hostname := urlparse(pypi_source.url).hostname):
-                    pip_args.extend(["--trusted-host", hostname])
-                else:
-                    pip_args.extend(
-                        [
-                            "--trusted-host",
-                            "pypi.org",
-                            "--trusted-host",
-                            "pypi.python.org",
-                            "--trusted-host",
-                            "files.pythonhosted.org",
-                        ]
-                    )
+            # Build pip install arguments
+            packages_to_install = [self.config.package_manager, *self.config.bootstrap_packages, CERTIFI_REQUIREMENT]
+            pip_args = ["install", *packages_to_install]
 
             logger.info(f"Installing bootstrap packages: {packages_to_install}")
             bootstrap_venv.pip(pip_args)
@@ -536,6 +537,41 @@ class CreateBootstrapEnvironment(Runnable):
         except Exception as exc:
             logger.error(f"Bootstrap environment creation failed at {self.bootstrap_env_dir}")
             raise UserNotificationException(f"Failed to create bootstrap environment: {exc}") from exc
+
+    def _upgrade_pip(self, bootstrap_venv: VirtualEnvironment, pypi_source: Optional[PyPiSource]) -> None:
+        """Upgrade pip in the bootstrap environment to MIN_PIP_VERSION.
+
+        The wheel is pinned by its hash, so the download is safe even if the bundled pip
+        cannot verify the server certificate.
+        """
+        requirements_file = self.bootstrap_env_dir / PIP_REQUIREMENTS_FILE
+        requirements_file.write_text(f"pip=={MIN_PIP_VERSION} --hash=sha256:{PIP_WHEEL_SHA256}\n")
+        # Run pip as a module: pip.exe cannot replace itself on Windows
+        pip_args = ["python", "-m", "pip", "install", "--require-hashes", "--only-binary", ":all:", "--no-deps", "-r", requirements_file.as_posix()]
+
+        # Older pip ignores the system certificate store, which breaks company proxies with own CAs.
+        # Skipping the certificate check is acceptable here only because the wheel hash is pinned.
+        if Version(ensurepip.version()) < Version(PIP_TRUSTSTORE_VERSION):
+            if pypi_source and (hostname := urlparse(pypi_source.url).hostname):
+                pip_args.extend(["--trusted-host", hostname])
+            else:
+                pip_args.extend(
+                    [
+                        "--trusted-host",
+                        "pypi.org",
+                        "--trusted-host",
+                        "pypi.python.org",
+                        "--trusted-host",
+                        "files.pythonhosted.org",
+                    ]
+                )
+
+        index_url = pypi_source.url if pypi_source else "https://pypi.org/simple"
+        logger.info(f"Upgrading pip from {ensurepip.version()} to {MIN_PIP_VERSION}")
+        try:
+            bootstrap_venv.run(pip_args)
+        except UserNotificationException as exc:
+            raise UserNotificationException(f"Could not upgrade pip to {MIN_PIP_VERSION} from {index_url}. Make sure this index serves pip {MIN_PIP_VERSION} (sha256 {PIP_WHEEL_SHA256}).\n{exc}") from exc
 
     def get_name(self) -> str:
         return "create-bootstrap-environment"
@@ -705,10 +741,31 @@ def print_environment_info() -> None:
     logger.info(str_bar)
 
 
+def check_python_version(required_version: str, actual_version: Tuple[int, ...]) -> None:
+    """Stop if the running Python is older than the required version.
+
+    Only a full version (e.g. '3.13.17') sets a minimum. A version like '3.13' is not checked.
+
+    Args:
+        required_version: The python_version from bootstrap.json.
+        actual_version: The version of the running Python, e.g. sys.version_info.
+    """
+    required_parts = required_version.split(".")
+    if len(required_parts) < 3:
+        return
+    actual = ".".join(map(str, actual_version[:3]))
+    if Version(actual) < Version(required_version):
+        raise UserNotificationException(
+            f"Python {actual} ({sys.executable}) is older than {required_version}, which bootstrap.json requires. "
+            f"Install Python {required_version} or newer (for example with 'scoop update python{required_parts[0]}{required_parts[1]}') and run again."
+        )
+
+
 def main() -> int:
     try:
         project_dir = Path.cwd()
         config = BootstrapConfig.from_json_file(project_dir / "bootstrap.json")
+        check_python_version(config.python_version, tuple(sys.version_info))
 
         # Step 1: Create the bootstrap environment (shared cache)
         bootstrap_env = CreateBootstrapEnvironment(config, project_dir)
