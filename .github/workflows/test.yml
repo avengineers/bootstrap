@@ -21,12 +21,6 @@ jobs:
                   .\tests\bin\init.ps1
                   .\tests\bin\test.ps1
               shell: pwsh
-            - name: Publish Test Results
-              uses: EnricoMi/publish-unit-test-result-action/windows@v2
-              if: always()
-              with:
-                  files: |
-                      tests/out/TestResults.xml
             - name: Bootstrap and run pytest
               env:
                   # Workaround to force usage of scoop apps installed in USERPROFILE.
@@ -35,6 +29,15 @@ jobs:
                   .\bootstrap.ps1
                   .\.venv\Scripts\pytest
               shell: pwsh
+            # Publish runs last: it creates its own venv with virtualenv, and newer
+            # virtualenv releases write a '.venv' redirect file next to pyproject.toml,
+            # which blocks bootstrap from creating the project's .venv directory.
+            - name: Publish Test Results
+              uses: EnricoMi/publish-unit-test-result-action/windows@v2
+              if: always()
+              with:
+                  files: |
+                      tests/out/TestResults.xml
     test_powershell:
         name: Unit and Integration Tests (Powershell 5.x)
         runs-on: windows-latest
