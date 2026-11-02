@@ -53,6 +53,7 @@ flowchart TD
 * Smart caching with hash-based dependency tracking. Only runs if dependencies have been updated.
 * Package manager support: Poetry, UV
 * Automatic pip configuration for custom PyPI sources
+* If the pip bundled with Python is older than 26.2.2, it is upgraded in the bootstrap environment with a hash-pinned install. `certifi>=2026.10.19` is always installed. Older pip and certifi releases trust a compromised certificate authority (GHSA-6q48-6c7w-9gw2). pip also trusts the Windows certificate store, which bootstrap does not change.
 
 ## bootstrap.json Configuration
 
@@ -69,7 +70,7 @@ flowchart TD
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `python_version` | Python version to use | System Python |
+| `python_version` | Python version to use. A full version such as `3.13.17` is a minimum. Bootstrap installs Python only if it is missing and never updates an existing installation, so it stops if the Python it finds is older (run `scoop update python313` to fix it). | System Python |
 | `python_package_manager` | Package manager with version constraint | `poetry>=2.1.0` |
 | `bootstrap_packages` | Packages to install in bootstrap environment | `["pip-system-certs>=4.0,<5.0"]` |
 | `venv_install_command` | Custom command to install dependencies | Auto-generated based on package manager |

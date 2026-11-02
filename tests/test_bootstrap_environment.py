@@ -3,15 +3,22 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from pytest_mock import MockerFixture
 
 from bootstrap import (
     BOOTSTRAP_COMPLETE_MARKER,
+    CERTIFI_REQUIREMENT,
     DEFAULT_BOOTSTRAP_PACKAGES,
     DEFAULT_PACKAGE_MANAGER,
+    MIN_PIP_VERSION,
+    PIP_REQUIREMENTS_FILE,
+    PIP_WHEEL_SHA256,
     BootstrapConfig,
     CreateBootstrapEnvironment,
     CreateVirtualEnvironment,
     UserNotificationException,
+    VirtualEnvironment,
+    check_python_version,
     extract_package_manager_name,
 )
 
@@ -116,6 +123,10 @@ def test_bootstrap_env_hash_deterministic():
         (
             {"python_version": "3.11", "package_manager": "poetry==2.0.0"},
             {"python_version": "3.11", "package_manager": "poetry==2.1.0"},
+        ),
+        (
+            {"python_version": "3.13", "package_manager": "poetry==2.1.0"},
+            {"python_version": "3.13.17", "package_manager": "poetry==2.1.0"},
         ),
     ],
 )
@@ -229,6 +240,103 @@ def test_create_bootstrap_environment_get_config(bootstrap_env: CreateBootstrapE
     assert "package_manager" in config
     assert "bootstrap_packages" in config
     assert "python_version" in config
+
+
+@pytest.fixture
+def pip_calls(mocker: MockerFixture) -> list[list[str]]:
+    """Mock venv creation and record the pip commands of the bootstrap environment in order."""
+    calls: list[list[str]] = []
+    mocker.patch("bootstrap.venv.create", side_effect=lambda env_dir, with_pip: Path(env_dir).mkdir(parents=True))
+    mocker.patch.object(VirtualEnvironment, "run", side_effect=lambda args, *_, **__: calls.append(["run", *args]))
+    mocker.patch.object(VirtualEnvironment, "pip", side_effect=lambda args: calls.append(["pip", *args]))
+    return calls
+
+
+@pytest.mark.parametrize(
+    ("bundled_pip", "expect_upgrade", "expect_trusted_host"),
+    [
+        ("23.0.1", True, True),
+        ("25.0.1", True, False),
+        ("26.2.2", False, False),
+    ],
+)
+def test_create_bootstrap_environment_upgrades_old_pip(mocker: MockerFixture, bootstrap_env: CreateBootstrapEnvironment, pip_calls: list[list[str]], bundled_pip: str, expect_upgrade: bool, expect_trusted_host: bool):
+    # Arrange
+    mocker.patch("bootstrap.ensurepip.version", return_value=bundled_pip)
+
+    # Act
+    bootstrap_env.run()
+
+    # Assert
+    upgrade_calls = [call for call in pip_calls if call[0] == "run"]
+    assert len(upgrade_calls) == (1 if expect_upgrade else 0)
+    if expect_upgrade:
+        upgrade_args = upgrade_calls[0]
+        assert pip_calls.index(upgrade_args) == 0
+        assert upgrade_args[1:4] == ["python", "-m", "pip"]
+        assert "--require-hashes" in upgrade_args
+        assert ("--trusted-host" in upgrade_args) == expect_trusted_host
+        requirements = (bootstrap_env.bootstrap_env_dir / PIP_REQUIREMENTS_FILE).read_text()
+        assert requirements == f"pip=={MIN_PIP_VERSION} --hash=sha256:{PIP_WHEEL_SHA256}\n"
+    install_args = pip_calls[-1]
+    assert install_args[:2] == ["pip", "install"]
+    assert CERTIFI_REQUIREMENT in install_args
+    assert "--trusted-host" not in install_args
+    assert bootstrap_env.marker_file.exists()
+
+
+def test_create_bootstrap_environment_pip_upgrade_trusts_only_pypi_source_host(mocker: MockerFixture, bootstrap_env: CreateBootstrapEnvironment, pip_calls: list[list[str]]):
+    # Arrange
+    mocker.patch("bootstrap.ensurepip.version", return_value="23.0.1")
+    (bootstrap_env.project_dir / "pyproject.toml").write_text('[tool.poetry.source]\nname = "mirror"\nurl = "https://mirror.example.com/simple"\n')
+
+    # Act
+    bootstrap_env.run()
+
+    # Assert
+    upgrade_args = pip_calls[0]
+    trusted_hosts = [upgrade_args[i + 1] for i, arg in enumerate(upgrade_args) if arg == "--trusted-host"]
+    assert trusted_hosts == ["mirror.example.com"]
+
+
+def test_create_bootstrap_environment_pip_upgrade_failure_stops(mocker: MockerFixture, bootstrap_env: CreateBootstrapEnvironment, pip_calls: list[list[str]]):
+    # Arrange
+    mocker.patch("bootstrap.ensurepip.version", return_value="24.0")
+    mocker.patch.object(VirtualEnvironment, "run", side_effect=UserNotificationException("no matching distribution"))
+
+    # Act & Assert
+    with pytest.raises(UserNotificationException, match=MIN_PIP_VERSION):
+        bootstrap_env.run()
+    assert pip_calls == []
+    assert not bootstrap_env.marker_file.exists()
+
+
+@pytest.mark.parametrize(
+    ("required_version", "actual_version"),
+    [
+        ("", (3, 13, 12)),
+        ("3.13", (3, 13, 12)),
+        ("3.13.17", (3, 13, 17)),
+        ("3.13.17", (3, 13, 18)),
+        ("3.13.17", (3, 14, 0)),
+    ],
+)
+def test_check_python_version_accepts(required_version: str, actual_version: tuple[int, ...]):
+    # Act & Assert
+    check_python_version(required_version, actual_version)
+
+
+@pytest.mark.parametrize(
+    ("required_version", "actual_version"),
+    [
+        ("3.13.17", (3, 13, 12)),
+        ("3.13.17", (3, 11, 9)),
+    ],
+)
+def test_check_python_version_rejects_older(required_version: str, actual_version: tuple[int, ...]):
+    # Act & Assert
+    with pytest.raises(UserNotificationException, match=r"3\.13\.17.*python313"):
+        check_python_version(required_version, actual_version)
 
 
 def test_create_bootstrap_environment_get_outputs_contains_marker(bootstrap_env: CreateBootstrapEnvironment):
