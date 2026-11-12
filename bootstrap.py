@@ -644,10 +644,12 @@ class CreateVirtualEnvironment(Runnable):
             logger.warning(f"Could not write Python version marker: {exc}")
 
     def _ensure_in_project_venv(self) -> None:
-        """Configure package managers to create venv in-project (.venv in repository)."""
+        """Configure package managers to create the venv in-project (.venv in repository); Poetry does so whatever the user config says."""
         if self.package_manager_name == "poetry":
             # Set environment variable for poetry to create venv in-project
             os.environ["POETRY_VIRTUALENVS_IN_PROJECT"] = "true"
+            # Environment variables override virtualenvs.create = false in the user's Poetry config
+            os.environ["POETRY_VIRTUALENVS_CREATE"] = "true"
         elif self.package_manager_name == "pipenv":
             # Set environment variable for pipenv
             os.environ["PIPENV_VENV_IN_PROJECT"] = "1"
