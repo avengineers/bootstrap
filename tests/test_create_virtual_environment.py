@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 from unittest.mock import patch
@@ -6,6 +7,7 @@ import pytest
 
 from bootstrap import (
     VENV_PYTHON_VERSION_MARKER,
+    BootstrapConfig,
     CreateBootstrapEnvironment,
     CreateVirtualEnvironment,
     instantiate_os_specific_venv,
@@ -203,3 +205,34 @@ def test_venv_preserved_when_python_version_matches(tmp_path: Path, bootstrap_en
     assert venv_dir.exists()
     assert dummy_file.exists()
     assert marker_file.read_text().strip() == current_version
+
+
+def test_poetry_venv_creation_forced_over_user_config(tmp_path: Path, bootstrap_env: CreateBootstrapEnvironment, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Arrange
+    monkeypatch.setenv("POETRY_VIRTUALENVS_CREATE", "false")
+    creator = CreateVirtualEnvironment(tmp_path, bootstrap_env=bootstrap_env)
+
+    # Act
+    with patch.dict(os.environ), patch.object(bootstrap_env.virtual_env, "run"):
+        creator.run()
+        venvs_create = os.environ.get("POETRY_VIRTUALENVS_CREATE")
+
+    # Assert
+    assert venvs_create == "true"
+
+
+@pytest.mark.parametrize("package_manager", ["uv>=0.6", "pipenv"])
+def test_poetry_venv_creation_not_set_for_other_package_managers(tmp_path: Path, project_dir: Path, monkeypatch: pytest.MonkeyPatch, package_manager: str) -> None:
+    # Arrange
+    monkeypatch.delenv("POETRY_VIRTUALENVS_CREATE", raising=False)
+    config = BootstrapConfig(bootstrap_cache_dir=tmp_path / ".bootstrap", package_manager=package_manager)
+    bootstrap_env = CreateBootstrapEnvironment(config, project_dir)
+    creator = CreateVirtualEnvironment(tmp_path, bootstrap_env=bootstrap_env)
+
+    # Act
+    with patch.dict(os.environ), patch.object(bootstrap_env.virtual_env, "run"):
+        creator.run()
+        is_set = "POETRY_VIRTUALENVS_CREATE" in os.environ
+
+    # Assert
+    assert not is_set
